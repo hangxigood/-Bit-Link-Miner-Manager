@@ -32,7 +32,7 @@ struct StatusInfo {
     #[serde(rename = "STATUS")]
     status: String,
     #[serde(rename = "Msg")]
-    msg: String,
+    _msg: String,
 }
 
 /// Summary data from CGMiner (supports both Antminer and Whatsminer formats)
