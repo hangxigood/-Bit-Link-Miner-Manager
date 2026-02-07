@@ -4,12 +4,15 @@ A high-performance Rust-based miner management system for CGMiner-compatible min
 
 ## Project Status
 
-**Step 1: Basic TCP Client** ✅ Complete
+**Step 1: Basic TCP Client** ✅ Complete  
+**Step 2: Network Scanner** ✅ Complete
 
-The core TCP client module is implemented and tested, supporting:
+The core TCP client and network scanner are implemented and tested, supporting:
 - CGMiner JSON-RPC protocol over TCP
-- Timeout handling (1.5s default)
+- Concurrent network scanning with semaphore-based resource management
 - Support for both Antminer and Whatsminer formats
+- CIDR notation (e.g., `192.168.1.0/24`) and IP range (e.g., `192.168.1.1-192.168.1.254`)
+- Real-time progress events
 - Comprehensive error handling
 
 ## Quick Start
@@ -59,6 +62,36 @@ cargo test -- --nocapture
      ...
    ```
 
+### Network Scanning
+
+Scan your entire network to discover all miners:
+
+```bash
+# Edit examples/scan_network.rs and set your network range
+# Example: "192.168.1.0/24" or "192.168.56.1-192.168.56.254"
+cargo run --example scan_network
+```
+
+Expected output:
+```
+=== Network Scanner Test ===
+Scanning range: 192.168.56.0/24 (256 IPs)
+Max concurrent: 100, Timeout: 2000ms
+
+[Progress: 50/256] ✓ Found miner at 192.168.56.31
+  Model: Antminer S19 XP
+  Hashrate: 143.02 TH/s
+  Uptime: 354237 seconds (98.4 hours)
+
+[Progress: 256/256 (100.0%)]
+
+=== Scan Complete ===
+Found: 1 miner(s)
+Failed: 255 IP(s)
+Duration: 6.23s
+```
+
+
 ## Architecture
 
 ```
@@ -68,13 +101,17 @@ src/
 │   └── error.rs    # MinerError types
 ├── client/         # TCP client for CGMiner protocol
 │   └── mod.rs      # send_command, get_summary
+├── scanner/        # Network scanner
+│   └── mod.rs      # scan_range, parse_ip_range, ScanEvent
 └── lib.rs          # Public API exports
 
 tests/
-└── mock_miner.rs   # Mock CGMiner server for testing
+├── mock_miner.rs      # Mock CGMiner server
+└── scanner_tests.rs   # Scanner integration tests
 
 examples/
-└── manual_test.rs  # Manual test with real hardware
+├── manual_test.rs     # Single miner test
+└── scan_network.rs    # Network scanning demo
 ```
 
 ## API Usage
@@ -92,9 +129,33 @@ async fn main() {
 }
 ```
 
+**Scan a network range:**
+```rust
+use bitlink_miner_manager::{scan_range, ScanConfig, ScanEvent};
+
+#[tokio::main]
+async fn main() {
+    let config = ScanConfig::default();
+    let mut rx = scan_range("192.168.1.0/24", config).await.unwrap();
+    
+    while let Some(event) = rx.recv().await {
+        match event {
+            ScanEvent::Found(miner) => {
+                println!("Found: {} - {:.2} TH/s", 
+                         miner.ip, miner.stats.hashrate_avg);
+            }
+            ScanEvent::Complete { found, .. } => {
+                println!("Scan complete! Found {} miners", found);
+                break;
+            }
+            _ => {}
+        }
+    }
+}
+```
+
 ## Next Steps
 
-- **Step 2**: Network scanner with concurrent IP range scanning
 - **Step 3**: Monitor loop with state management
 - **Step 4**: Flutter integration via flutter_rust_bridge
 
