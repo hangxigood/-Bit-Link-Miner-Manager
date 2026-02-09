@@ -1,0 +1,3 @@
+# Cargokit configuration
+# Specifies the path to the Rust crate relative to this file
+crate_path: ../../backend
