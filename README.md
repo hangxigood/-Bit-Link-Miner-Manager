@@ -22,11 +22,16 @@ The core backend is fully implemented, supporting:
 ### Prerequisites
 
 - Rust 1.93+ (installed automatically if needed)
+- Flutter 3.19+ (Follow [installation guide](https://docs.flutter.dev/get-started/install))
 - Access to a CGMiner-compatible miner on your network
 
 ### Running Tests
 
+> **Note:** All Rust commands must be run from the `backend/` directory.
+
 ```bash
+cd backend
+
 # Run all automated tests
 cargo test
 
@@ -36,14 +41,14 @@ cargo test -- --nocapture
 
 ### Manual Testing with Real Miner
 
-1. Edit `examples/manual_test.rs` and update the miner IP address:
+1. Edit `backend/examples/manual_test.rs` and update the miner IP address:
    ```rust
    let miner_ip = "192.168.1.100"; // <-- Change to your miner's IP
    ```
 
 2. Run the manual test:
    ```bash
-   cargo run --example manual_test
+   cd backend && cargo run --example manual_test
    ```
 
 3. Expected output:
@@ -137,28 +142,20 @@ Monitoring 2 miner(s) with 10-second poll interval
 
 ## Architecture
 
+## Architecture
+
 ```
-src/
-├── core/           # Data structures and error types
-│   ├── models.rs   # Miner, MinerStats, MinerStatus
-│   └── error.rs    # MinerError types
-├── client/         # TCP client for CGMiner protocol
-│   └── mod.rs      # send_command, get_summary
-├── scanner/        # Network scanner
-│   └── mod.rs      # scan_range, parse_ip_range, ScanEvent
-├── monitor/        # Continuous monitoring
-│   └── mod.rs      # start_monitor, MonitorEvent, MonitorConfig
-└── lib.rs          # Public API exports
+backend/            # Rust Backend ("The Engine")
+├── src/            # Core logic
+│   ├── client/     # TCP client
+│   ├── scanner/    # Network scanner
+│   ├── monitor/    # Continuous monitoring
+│   └── lib.rs      # Public API exports
+├── examples/       # Usage demos
+└── tests/          # Integration tests
 
-tests/
-├── mock_miner.rs      # Mock CGMiner server
-├── scanner_tests.rs   # Scanner integration tests
-└── monitor_tests.rs   # Monitor integration tests
-
-examples/
-├── manual_test.rs     # Single miner test
-├── scan_network.rs    # Network scanning demo
-└── monitor_demo.rs    # Continuous monitoring demo
+frontend/           # Flutter Frontend ("The Cockpit")
+└── lib/            # UI components (Coming soon)
 ```
 
 ## API Usage
