@@ -5,14 +5,16 @@ A high-performance Rust-based miner management system for CGMiner-compatible min
 ## Project Status
 
 **Step 1: Basic TCP Client** ✅ Complete  
-**Step 2: Network Scanner** ✅ Complete
+**Step 2: Network Scanner** ✅ Complete  
+**Step 3: Monitor Loop** ✅ Complete
 
-The core TCP client and network scanner are implemented and tested, supporting:
+The core backend is fully implemented, supporting:
 - CGMiner JSON-RPC protocol over TCP
 - Concurrent network scanning with semaphore-based resource management
+- Continuous monitoring with real-time status tracking
 - Support for both Antminer and Whatsminer formats
 - CIDR notation (e.g., `192.168.1.0/24`) and IP range (e.g., `192.168.1.1-192.168.1.254`)
-- Real-time progress events
+- Real-time progress events and state updates
 - Comprehensive error handling
 
 ## Quick Start
@@ -91,6 +93,47 @@ Failed: 255 IP(s)
 Duration: 6.23s
 ```
 
+### Continuous Monitoring
+
+Monitor discovered miners in real-time with automatic status tracking:
+
+```bash
+cargo run --example monitor_demo
+```
+
+This will:
+1. Scan your network for miners
+2. Start monitoring them every 10 seconds
+3. Display real-time status updates in a live table
+
+Expected output:
+```
+Step 1: Scanning network for miners...
+  ✓ Found: 192.168.56.31 (Antminer S19 XP)
+  ✓ Found: 192.168.56.32 (Antminer S19 XP)
+
+Scan complete! Found 2 miner(s)
+
+Step 2: Starting continuous monitoring...
+Monitoring 2 miner(s) with 10-second poll interval
+
+[  10.5s] 📊 Status Snapshot:
+  ┌────────────────────┬──────────┬────────────┬──────────┐
+  │ IP Address         │ Status   │ Hashrate   │ Max Temp │
+  ├────────────────────┼──────────┼────────────┼──────────┤
+  │ 192.168.56.31      │ ✅ Active │  143.03 TH │   72.5°C │
+  │ 192.168.56.32      │ ✅ Active │  136.82 TH │   71.2°C │
+  └────────────────────┴──────────┴────────────┴──────────┘
+```
+
+**Status indicators:**
+- ✅ **Active**: Healthy (temp < 85°C, hashrate normal)
+- ⚠️ **Warning**: High temperature OR low hashrate
+- ❌ **Dead**: Not responding
+
+
+
+
 
 ## Architecture
 
@@ -103,15 +146,19 @@ src/
 │   └── mod.rs      # send_command, get_summary
 ├── scanner/        # Network scanner
 │   └── mod.rs      # scan_range, parse_ip_range, ScanEvent
+├── monitor/        # Continuous monitoring
+│   └── mod.rs      # start_monitor, MonitorEvent, MonitorConfig
 └── lib.rs          # Public API exports
 
 tests/
 ├── mock_miner.rs      # Mock CGMiner server
-└── scanner_tests.rs   # Scanner integration tests
+├── scanner_tests.rs   # Scanner integration tests
+└── monitor_tests.rs   # Monitor integration tests
 
 examples/
 ├── manual_test.rs     # Single miner test
-└── scan_network.rs    # Network scanning demo
+├── scan_network.rs    # Network scanning demo
+└── monitor_demo.rs    # Continuous monitoring demo
 ```
 
 ## API Usage
@@ -154,9 +201,32 @@ async fn main() {
 }
 ```
 
+**Monitor miners continuously:**
+```rust
+use bitlink_miner_manager::{start_monitor, MonitorConfig, MonitorEvent};
+
+#[tokio::main]
+async fn main() {
+    let ips = vec!["192.168.1.31".to_string(), "192.168.1.32".to_string()];
+    let config = MonitorConfig::default(); // Polls every 10 seconds
+    let mut rx = start_monitor(ips, config).await;
+    
+    while let Some(event) = rx.recv().await {
+        match event {
+            MonitorEvent::MinerUpdated(miner) => {
+                println!("{} is now {:?}", miner.ip, miner.status);
+            }
+            MonitorEvent::FullSnapshot(miners) => {
+                println!("Current fleet: {} miners", miners.len());
+            }
+            _ => {}
+        }
+    }
+}
+```
+
 ## Next Steps
 
-- **Step 3**: Monitor loop with state management
 - **Step 4**: Flutter integration via flutter_rust_bridge
 
 ## Technical Details
