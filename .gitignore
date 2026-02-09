@@ -1,1 +1,27 @@
+# Rust
 /target
+backend/target/
+Cargo.lock
+
+# Flutter/Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/pubspec.lock
+frontend/.metadata
+frontend/.idea/
+frontend/*.iml
+
+# Flutter Rust Bridge Generated
+backend/src/frb_generated.rs
+frontend/lib/src/rust/
+
+# macOS
+.DS_Store
+frontend/macos/Flutter/ephemeral/
+frontend/macos/Pods/
+
+# Symlinks
+frontend/rust
