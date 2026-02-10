@@ -141,6 +141,16 @@ pub trait MinerClient {
 
 **Source:** [backend/src/api/mod.rs](../backend/src/api/mod.rs)
 
+### 3.6 `scanner` (Scan Progress) [NOT IMPLEMENTED]
+To support real-time progress bars in the UI, the scanner module needs to expose atomic counters.
+
+**Proposed Implementation:**
+```rust
+static SCAN_PROGRESS_FOUND: AtomicU32 = AtomicU32::new(0);
+static SCAN_PROGRESS_TOTAL: AtomicU32 = AtomicU32::new(0);
+pub fn get_scan_progress() -> (u32, u32, bool) { ... }
+```
+
 ## 4. Flutter UI Components
 
 The frontend is organized into reusable widgets that consume data from the Rust backend via FFI streams.
@@ -150,18 +160,28 @@ The frontend is organized into reusable widgets that consume data from the Rust 
 ```text
     +-----------------------------------------------------------+
     |                     MinerDashboard                        |
-    |           (State: List<Miner>, SelectedIPs)               |
-    +-----------+----------------------+------------------------+
-                |                      |                        |
-      +---------v---------+    +-------v-------+      +---------v--------+
-      |ScannerControlPanel|    | MinerListView |      |  BatchActionBar  |
-      |  (Input: Range)   |    |  (Data Grid)  |      |  (Bulk Actions)  |
-      +-------------------+    +-------+-------+      +------------------+
-                                       |
-                                 +-----v-----+
-                                 |MinerDetail|
-                                 |   Dialog  |
-                                 +-----------+
+    |  (State: List<Miner>, SelectedIPs, Search, Filters, Sort) |
+    +-----+-----------+------------+------------+---------------+
+          |           |            |            |
+  +-------v--------+  |  +---------v---------+ |  +------------v-----+
+  |ScannerControl  |  |  | SearchFilterBar   | |  |  BatchActionBar  |
+  |Panel           |  |  | (Text + Toggles)  | |  |  (Bulk Actions)  |
+  |(Collapsible)   |  |  +-------------------+ |  +------------------+
+  +----------------+  |                        |
+                +-----v------------------------v---+
+                |         MinerListView            |
+                |  (Sortable, Color-coded rows,    |
+                |   Sticky headers, Wide grid)     |
+                +----------------------------------+
+                                |
+                         +------v------+
+                         | MinerDetail |
+                         |   Dialog    |
+                         +-------------+
+    +-----------------------------------------------------------+
+    |                      StatusBar                            |
+    |   Total: X | Active: X | Warning: X | Offline: X | Sel: X|
+    +-----------------------------------------------------------+
 ```
 
 ### 4.1 `MinerListView` (Main Screen)
@@ -174,6 +194,26 @@ The frontend is organized into reusable widgets that consume data from the Rust 
 
 **Source:** `frontend/lib/src/widgets/miner_list_view.dart`
 
+### 4.1.1 Color-Coded Row Backgrounds [Implemented]
+Rows are tinted based on the miner's status:
+*   **Active:** Default (no tint)
+*   **Warning:** `Colors.orange.withOpacity(0.1)`
+*   **Dead:** `Colors.red.withOpacity(0.15)`
+*   **Scanning:** `Colors.blue.withOpacity(0.08)`
+
+### 4.1.2 Column Sorting [Implemented]
+**State:** `_sortColumnIndex`, `_sortAscending`
+**Sortable Columns:** Status, IP, Model, Hashrate RT, Hashrate Avg, Max Temp, Uptime.
+**Logic:** `DataColumn.onSort` triggers a state update and resorting of the local list.
+
+### 4.1.3 Wide Data Grid Polish [Partially Implemented]
+*   **Minimum column widths:** [Partially Implemented] - Basic logic exists.
+*   **Monospaced numbers:** [NOT IMPLEMENTED] - Should apply `fontFamily: 'monospace'` to numeric cells.
+*   **Frozen left columns:** [NOT IMPLEMENTED] - Status and IP columns should remain visible while scrolling horizontally.
+
+### 4.1.4 Sticky Column Headers [NOT IMPLEMENTED]
+**Requirement:** Split the `DataTable` into a fixed header row and a scrollable body to keep headers visible while vertically scrolling.
+
 ### 4.2 `ScannerControlPanel`
 **Purpose:** Network discovery interface.
 
@@ -183,6 +223,17 @@ The frontend is organized into reusable widgets that consume data from the Rust 
 *   **Output:** Triggers `onScanComplete` callback with results.
 
 **Source:** `frontend/lib/src/widgets/scanner_control_panel.dart`
+
+### 4.2.1 Collapsible UI [Partially Implemented]
+**Behavior:**
+*   **Expanded:** Full layout (title, range input, scan button).
+*   **Collapsed:** Compact row (Title + Scan button).
+*   **Auto-Collapse:** [NOT IMPLEMENTED] Should automatically collapse after the first scan completes.
+
+### 4.2.2 Real-Time Scan Progress [NOT IMPLEMENTED]
+**Behavior:**
+*   **Polling:** Poll `get_scan_progress()` every 500ms.
+*   **Display:** `"Scanning: X/Y IPs... (Z miners found)"`.
 
 ### 4.3 `MinerDetailDialog`
 **Purpose:** Expanded view for individual miner inspection.
@@ -208,6 +259,29 @@ The frontend is organized into reusable widgets that consume data from the Rust 
 *   **Feedback:** Shows progress indicator and success/failure toast notifications.
 
 **Source:** `frontend/lib/src/widgets/batch_action_bar.dart` *(to be implemented)*
+
+### 4.4.1 Staggered Batch Execution [NOT IMPLEMENTED]
+**Requirement:** To prevent network flooding and handle device limitations, batch actions should be staggered.
+
+**Proposed Backend Logic:**
+*   **BatchConfig:** `max_concurrent: 10`, `delay_between_batches_ms: 0`.
+*   **Concurrency:** Use `tokio::sync::Semaphore` to limit concurrent tasks.
+
+## 4.5 StatusBar [Implemented]
+**Widget:** `StatusBar` — `frontend/lib/src/widgets/status_bar.dart`
+
+**Behavior:**
+*   **Input:** `List<Miner>`, `int selectedCount`
+*   **Output:** Fixed bottom bar: `Total: X | Active: X | Warning: X | Offline: X | Selected: X`
+*   **Styling:** Compact height, monospaced counts, color-coded.
+
+## 4.6 SearchFilterBar [NOT IMPLEMENTED]
+**Widget:** `SearchFilterBar` — `frontend/lib/src/widgets/search_filter_bar.dart`
+
+**Behavior:**
+*   **Inputs:** `onSearchChanged(String)`, `onFilterChanged(Set<String>)`
+*   **Components:** Text search (IP/Model) + Filter Chips (Active/Warning).
+*   **Logic:** `MinerDashboard` filters the list before passing it to `MinerListView`.
 
 ## 5. CGMiner API Protocol Detail
 
@@ -295,3 +369,18 @@ These functions are defined in the `backend/src/api` module:
 *   **Alerts:** Desktop notifications.
 *   **Bulk Config:** Pool configuration updates.
 *   **Remote Access:** WebSocket control.
+
+
+## 15. Implementation Priority (Revised)
+
+| Order | Feature | Status |
+| :---: | :--- | :--- |
+| 1 | Color-coded row backgrounds | **Implemented** |
+| 2 | Status bar | **Implemented** |
+| 3 | Column sorting | **Implemented** |
+| 4 | Collapsible scanner panel | **Partially Implemented** |
+| 5 | Search & filter bar | **Pending** |
+| 6 | Staggered batch execution | **Pending** |
+| 7 | Scan progress | **Pending** |
+| 8 | Sticky column headers | **Pending** |
+| 9 | Wide data grid polish | **Partially Implemented** |

@@ -5,7 +5,7 @@ import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/services/credentials_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class MinerListView extends StatelessWidget {
+class MinerListView extends StatefulWidget {
   final List<Miner> miners;
   final List<String> selectedIps;
   final Function(List<String>) onSelectionChanged;
@@ -18,8 +18,64 @@ class MinerListView extends StatelessWidget {
   });
 
   @override
+  State<MinerListView> createState() => _MinerListViewState();
+}
+
+class _MinerListViewState extends State<MinerListView> {
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
+
+  List<Miner> get _sortedMiners {
+    final miners = List<Miner>.from(widget.miners);
+    
+    if (_sortColumnIndex == null) return miners;
+
+    miners.sort((a, b) {
+      int comparison = 0;
+      
+      switch (_sortColumnIndex) {
+        case 0: // Status
+          comparison = a.status.index.compareTo(b.status.index);
+          break;
+        case 1: // IP Address
+          comparison = a.ip.compareTo(b.ip);
+          break;
+        case 3: // Model
+          comparison = (a.model ?? '').compareTo(b.model ?? '');
+          break;
+        case 4: // Hashrate RT
+          comparison = a.stats.hashrateRt.compareTo(b.stats.hashrateRt);
+          break;
+        case 5: // Hashrate Avg
+          comparison = a.stats.hashrateAvg.compareTo(b.stats.hashrateAvg);
+          break;
+        case 6: // Max Temp
+          final aMaxTemp = _getMaxTemp(a.stats);
+          final bMaxTemp = _getMaxTemp(b.stats);
+          comparison = aMaxTemp.compareTo(bMaxTemp);
+          break;
+        case 8: // Uptime
+          comparison = a.stats.uptime.compareTo(b.stats.uptime);
+          break;
+      }
+      
+      return _sortAscending ? comparison : -comparison;
+    });
+    
+    return miners;
+  }
+
+  double _getMaxTemp(MinerStats stats) {
+    final allTemps = <double>[
+      ...stats.temperatureChip,
+      ...stats.temperaturePcb,
+    ];
+    return allTemps.isEmpty ? 0.0 : allTemps.reduce((a, b) => a > b ? a : b);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (miners.isEmpty) {
+    if (widget.miners.isEmpty) {
       return const Center(
         child: Text(
           'No miners found. Start a scan to discover miners.',
@@ -27,6 +83,8 @@ class MinerListView extends StatelessWidget {
         ),
       );
     }
+
+    final sortedMiners = _sortedMiners;
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -36,38 +94,106 @@ class MinerListView extends StatelessWidget {
           constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
           child: DataTable(
             showCheckboxColumn: true,
-            columns: const [
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('IP Address')),
-              DataColumn(label: Text('MAC Address')),
-              DataColumn(label: Text('Model')),
-              DataColumn(label: Text('Hashrate RT')),
-              DataColumn(label: Text('Hashrate Avg')),
-              DataColumn(label: Text('Max Temp')),
-              DataColumn(label: Text('Fans')),
-              DataColumn(label: Text('Uptime')),
-              DataColumn(label: Text('Pool 1')),
-              DataColumn(label: Text('Worker 1')),
-              DataColumn(label: Text('Pool 2')),
-              DataColumn(label: Text('Worker 2')),
-              DataColumn(label: Text('Pool 3')),
-              DataColumn(label: Text('Worker 3')),
-              DataColumn(label: Text('Firmware')),
-              DataColumn(label: Text('Software')),
-              DataColumn(label: Text('Hardware')),
+            sortColumnIndex: _sortColumnIndex,
+            sortAscending: _sortAscending,
+            columns: [
+              DataColumn(
+                label: const Text('Status'),
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              DataColumn(
+                label: const Text('IP Address'),
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              const DataColumn(label: Text('MAC Address')),
+              DataColumn(
+                label: const Text('Model'),
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              DataColumn(
+                label: const Text('Hashrate RT'),
+                numeric: true,
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              DataColumn(
+                label: const Text('Hashrate Avg'),
+                numeric: true,
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              DataColumn(
+                label: const Text('Max Temp'),
+                numeric: true,
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              const DataColumn(label: Text('Fans')),
+              DataColumn(
+                label: const Text('Uptime'),
+                numeric: true,
+                onSort: (columnIndex, ascending) {
+                  setState(() {
+                    _sortColumnIndex = columnIndex;
+                    _sortAscending = ascending;
+                  });
+                },
+              ),
+              const DataColumn(label: Text('Pool 1')),
+              const DataColumn(label: Text('Worker 1')),
+              const DataColumn(label: Text('Pool 2')),
+              const DataColumn(label: Text('Worker 2')),
+              const DataColumn(label: Text('Pool 3')),
+              const DataColumn(label: Text('Worker 3')),
+              const DataColumn(label: Text('Firmware')),
+              const DataColumn(label: Text('Software')),
+              const DataColumn(label: Text('Hardware')),
             ],
-            rows: miners.map((miner) {
-              final isSelected = selectedIps.contains(miner.ip);
+            rows: sortedMiners.map((miner) {
+              final isSelected = widget.selectedIps.contains(miner.ip);
               return DataRow(
                 selected: isSelected,
+                color: WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (miner.status == MinerStatus.dead) return Colors.red.withOpacity(0.15);
+                  if (miner.status == MinerStatus.warning) return Colors.orange.withOpacity(0.1);
+                  if (miner.status == MinerStatus.scanning) return Colors.blue.withOpacity(0.08);
+                  return null; // Active - default
+                }),
                 onSelectChanged: (bool? selected) {
-                  final newList = List<String>.from(selectedIps);
+                  final newList = List<String>.from(widget.selectedIps);
                   if (selected == true) {
                     newList.add(miner.ip);
                   } else {
                     newList.remove(miner.ip);
                   }
-                  onSelectionChanged(newList);
+                  widget.onSelectionChanged(newList);
                 },
                 onLongPress: () async {
                   // Get credentials from settings

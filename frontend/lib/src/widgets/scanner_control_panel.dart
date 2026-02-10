@@ -13,6 +13,7 @@ class ScannerControlPanel extends StatefulWidget {
 class _ScannerControlPanelState extends State<ScannerControlPanel> {
   final TextEditingController _ipRangeController = TextEditingController();
   bool _isScanning = false;
+  bool _isExpanded = true;
   String? _errorMessage;
 
   @override
@@ -73,17 +74,43 @@ class _ScannerControlPanelState extends State<ScannerControlPanel> {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Network Scanner',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
+      child: ExpansionTile(
+        title: const Text(
+          'Network Scanner',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        initiallyExpanded: _isExpanded,
+        onExpansionChanged: (expanded) {
+          setState(() {
+            _isExpanded = expanded;
+          });
+        },
+        trailing: _isExpanded
+            ? null
+            : ElevatedButton.icon(
+                onPressed: _isScanning ? null : _startScan,
+                icon: _isScanning
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.search),
+                label: Text(_isScanning ? 'Scanning...' : 'Scan'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
               children: [
                 Expanded(
                   child: TextField(
@@ -120,8 +147,8 @@ class _ScannerControlPanelState extends State<ScannerControlPanel> {
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
