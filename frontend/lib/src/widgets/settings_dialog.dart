@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/src/services/credentials_service.dart';
+import 'package:frontend/src/theme/app_theme.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
@@ -8,16 +9,36 @@ class SettingsDialog extends StatefulWidget {
   State<SettingsDialog> createState() => _SettingsDialogState();
 }
 
-class _SettingsDialogState extends State<SettingsDialog> {
+class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  
+  // Credentials
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = true;
   bool _obscurePassword = true;
+  
+  // General settings
+  double _scanThreadCount = 32;
+  double _monitorInterval = 30;
+  
+  // Alert settings
+  bool _tempAlertsEnabled = false;
+  double _tempThreshold = 85;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadCredentials();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCredentials() async {
@@ -37,7 +58,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credentials saved successfully')),
+        const SnackBar(content: Text('Settings saved successfully')),
       );
       Navigator.of(context).pop();
     }
@@ -55,62 +76,42 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 
   @override
-  void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Miner Credentials'),
+      title: Row(
+        children: [
+          Text('Settings'),
+          Spacer(),
+          IconButton(
+            icon: Icon(Icons.close, size: 20),
+            onPressed: () => Navigator.pop(context),
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+          ),
+        ],
+      ),
       content: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : SizedBox(
-              width: 400,
+              width: 600,
+              height: 400,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Default credentials for accessing miner web interfaces and sending commands.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  TabBar(
+                    controller: _tabController,
+                    tabs: [
+                      Tab(text: 'General'),
+                      Tab(text: 'Alerts'),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildGeneralTab(),
+                        _buildAlertsTab(),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton.icon(
-                    onPressed: _resetToDefaults,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reset to Defaults (root/root)'),
                   ),
                 ],
               ),
@@ -127,4 +128,166 @@ class _SettingsDialogState extends State<SettingsDialog> {
       ],
     );
   }
+
+  Widget _buildGeneralTab() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Scan Settings',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: 16),
+          
+          // Scan thread count slider
+          Text(
+            'Scan Thread Count: ${_scanThreadCount.toInt()}',
+            style: TextStyle(fontSize: 12),
+          ),
+          Slider(
+            value: _scanThreadCount,
+            min: 1,
+            max: 64,
+            divisions: 63,
+            label: _scanThreadCount.toInt().toString(),
+            onChanged: (value) {
+              setState(() {
+                _scanThreadCount = value;
+              });
+            },
+          ),
+          
+          SizedBox(height: 16),
+          
+          // Monitor interval slider
+          Text(
+            'Monitor Interval: ${_monitorInterval.toInt()} seconds',
+            style: TextStyle(fontSize: 12),
+          ),
+          Slider(
+            value: _monitorInterval,
+            min: 5,
+            max: 120,
+            divisions: 23,
+            label: '${_monitorInterval.toInt()}s',
+            onChanged: (value) {
+              setState(() {
+                _monitorInterval = value;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertsTab() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Temperature Alerts',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: 16),
+          
+          // Temp alerts toggle
+          Row(
+            children: [
+              Switch(
+                value: _tempAlertsEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _tempAlertsEnabled = value;
+                  });
+                },
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Enable temperature alerts',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          
+          SizedBox(height: 16),
+          
+          // Temp threshold slider
+          Text(
+            'Alert Threshold: ${_tempThreshold.toInt()}°C',
+            style: TextStyle(fontSize: 12),
+          ),
+          Slider(
+            value: _tempThreshold,
+            min: 60,
+            max: 100,
+            divisions: 40,
+            label: '${_tempThreshold.toInt()}°C',
+            onChanged: _tempAlertsEnabled
+                ? (value) {
+                    setState(() {
+                      _tempThreshold = value;
+                    });
+                  }
+                : null,
+          ),
+          
+          SizedBox(height: 24),
+          Divider(),
+          SizedBox(height: 16),
+          
+          Text(
+            'SSH Credentials',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Default credentials for accessing miner web interfaces and sending commands.',
+            style: TextStyle(fontSize: 11, color: context.mutedText),
+          ),
+          SizedBox(height: 16),
+          
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(
+              labelText: 'Username',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.person),
+            ),
+          ),
+          SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.lock),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: _resetToDefaults,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reset to Defaults (root/root)'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
