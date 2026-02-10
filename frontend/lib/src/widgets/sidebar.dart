@@ -29,35 +29,44 @@ class Sidebar extends StatelessWidget {
       curve: Curves.easeInOut,
       width: isCollapsed ? 0 : 320,
       child: ClipRect(
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            border: Border(
-              right: BorderSide(color: context.border, width: 1),
-            ),
-          ),
-          child: ListView(
-            padding: EdgeInsets.all(12),
-            children: [
-              IpRangesSection(
-                key: ipRangesSectionKey,
-                onScanStart: onScanStart,
-                onScanComplete: onScanComplete,
-                onShowToast: onShowToast,
+        child: OverflowBox(
+          alignment: Alignment.centerLeft,
+          maxWidth: 320,
+          child: Container(
+            width: 320,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                right: BorderSide(color: context.border, width: 1),
               ),
-              SizedBox(height: 12),
-              Divider(height: 1, thickness: 1),
-              SizedBox(height: 12),
-              PoolConfigSection(onShowToast: onShowToast),
-              SizedBox(height: 12),
-              Divider(height: 1, thickness: 1),
-              SizedBox(height: 12),
-              PowerControlSection(onShowToast: onShowToast),
-              SizedBox(height: 12),
-              Divider(height: 1, thickness: 1),
-              SizedBox(height: 12),
-              OverclockSection(onShowToast: onShowToast),
-            ],
+            ),
+            child: Visibility(
+              visible: !isCollapsed,
+              maintainState: true,
+              child: ListView(
+                padding: EdgeInsets.all(12),
+                children: [
+                  IpRangesSection(
+                    key: ipRangesSectionKey,
+                    onScanStart: onScanStart,
+                    onScanComplete: onScanComplete,
+                    onShowToast: onShowToast,
+                  ),
+                  SizedBox(height: 12),
+                  Divider(height: 1, thickness: 1),
+                  SizedBox(height: 12),
+                  PoolConfigSection(onShowToast: onShowToast),
+                  SizedBox(height: 12),
+                  Divider(height: 1, thickness: 1),
+                  SizedBox(height: 12),
+                  PowerControlSection(onShowToast: onShowToast),
+                  SizedBox(height: 12),
+                  Divider(height: 1, thickness: 1),
+                  SizedBox(height: 12),
+                  OverclockSection(onShowToast: onShowToast),
+                ],
+              ),
+            ),
           ),
         ),
       ),
