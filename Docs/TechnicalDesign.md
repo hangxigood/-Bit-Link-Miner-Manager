@@ -38,16 +38,49 @@ graph TD
 
 ## 3. Rust Module Design
 
-The Rust codebase is organized into distinct modules. For full implementation details, refer to the source code links.
+The Rust codebase (crate: `rust_lib_frontend`) is organized into distinct modules. For full implementation details, refer to the source code links.
+
+### Module Dependency Graph
+
+```text
+    +-----------------------------------------------------------+
+    |                      api (Facade)                         |
+    |  - Exposes: start_scan, start_monitoring                  |
+    +------------------------+----------------------------------+
+                             |
+           +-----------------v-----------------+
+           |                                   |
++----------v----------+             +----------v----------+
+|      scanner        |             |      monitor        |
+| - IP Range Scanning |             | - State Management  |
+| - Discovery Stream  |             | - Polling Loop      |
++----------+----------+             +----------+----------+
+           |                                   |
+           +-----------------v-----------------+
+                             |
+             +---------------v---------------+
+             |            client             |
+             | - CGMiner Protocol Impl       |
+             | - TCP / Socket Communication  |
+             +---------------+---------------+
+                             |
+                  +----------v----------+
+                  |        core         |
+                  | - Domain Models     |
+                  +---------------------+
+```
 
 ### 3.1 `core`
 **Responsibility:** Shared data models and domain types used across the application.
 
 **Key Types:**
-*   **`Miner`** ([src/core/mod.rs](../src/core/mod.rs)): Represents a mining device.
+*   **`Miner`** ([backend/src/core/mod.rs](../backend/src/core/mod.rs)): Represents a mining device.
     *   Input: IP address, discovery metadata.
     *   Output: Aggregated device state (model, stats, status).
-*   **`MinerStats`**: Real-time metrics (hashrate, temps, fans, uptime).
+*   **`MinerStats`**: Real-time metrics and detailed device info.
+    *   **Metrics:** `hashrate_rt` (5s avg), `hashrate_avg` (session avg), `temperature_chip` (all chips), `temperature_pcb` (all boards), `fan_speeds`, `uptime`.
+    *   **Configuration:** `pool1`..`pool3`, `worker1`..`worker3` (Top 3 pools/workers).
+    *   **System:** `firmware` (Version/Date), `software` (Miner implementation), `hardware` (Physical model), `mac_address`.
 *   **`MinerStatus`**: logic for health classification.
     *   `Active`: Responding + temp < 85°C + hashrate > 90% expected.
     *   `Warning`: Use for degraded performance.
@@ -62,8 +95,9 @@ The Rust codebase is organized into distinct modules. For full implementation de
 *   **Logic:** Spawns lightweight `tokio::task`s for each IP to attempt TCP handshake on port 4028.
 *   **Concurrency:** Uses a semaphore to limit concurrent open file descriptors (batch processing).
 *   **Output:** Stream of found devices.
+*   **Enhanced Parsing:** The scanner/monitor now intelligently chains multiple commands (`summary`, `stats`, `pools`, `version`) to build a complete device profile, handling model-specific quirks (e.g., Antminer vs Whatsminer hashrate formats).
 
-**Source:** [src/scanner/mod.rs](../src/scanner/mod.rs)
+**Source:** [backend/src/scanner/mod.rs](../backend/src/scanner/mod.rs)
 
 ### 3.3 `client` (Miner Communication)
 **Responsibility:** Encapsulates the CGMiner / BMiner API protocol.
@@ -85,7 +119,7 @@ pub trait MinerClient {
 }
 ```
 
-**Source:** [src/client/mod.rs](../src/client/mod.rs)
+**Source:** [backend/src/client/mod.rs](../backend/src/client/mod.rs)
 
 ### 3.4 `monitor`
 **Responsibility:** Manages the lifecycle of known miners.
@@ -95,9 +129,87 @@ pub trait MinerClient {
 *   **State:** Holds a concurrent hash map (`DashMap`) of the latest miner states.
 *   **Broadcasting:** Pushes state updates/diffs to the UI via the bridge.
 
-**Source:** [src/monitor/mod.rs](../src/monitor/mod.rs)
+**Source:** [backend/src/monitor/mod.rs](../backend/src/monitor/mod.rs)
 
-## 4. CGMiner API Protocol Detail
+### 3.5 `api` (High-Level Interface)
+**Responsibility:** Facade layer for the Flutter bridge. Wraps core functionality into cohesive, FFI-friendly APIs.
+
+**Key Components:**
+*   **`scanner`**: Orchestrates `scan_range`, collecting stream events into a final `Vec<Miner>` result for simple frontend consumption.
+*   **`monitor`**: Manages global state of monitored miners (`CURRENT_MINERS`) and exposes a simplified `start_monitoring` command.
+*   **`commands`**: Implements `execute_batch_command` for parallel control operations.
+
+**Source:** [backend/src/api/mod.rs](../backend/src/api/mod.rs)
+
+## 4. Flutter UI Components
+
+The frontend is organized into reusable widgets that consume data from the Rust backend via FFI streams.
+
+### Component Dependency Graph
+
+```text
+    +-----------------------------------------------------------+
+    |                     MinerDashboard                        |
+    |           (State: List<Miner>, SelectedIPs)               |
+    +-----------+----------------------+------------------------+
+                |                      |                        |
+      +---------v---------+    +-------v-------+      +---------v--------+
+      |ScannerControlPanel|    | MinerListView |      |  BatchActionBar  |
+      |  (Input: Range)   |    |  (Data Grid)  |      |  (Bulk Actions)  |
+      +-------------------+    +-------+-------+      +------------------+
+                                       |
+                                 +-----v-----+
+                                 |MinerDetail|
+                                 |   Dialog  |
+                                 +-----------+
+```
+
+### 4.1 `MinerListView` (Main Screen)
+**Purpose:** Displays all discovered miners in a sortable data table.
+
+**Behavior:**
+*   **Input:** `List<Miner>`
+*   **Features:** Sortable columns (Status, IP, Model, Hashrate RT, Max Temp, Pool, Worker), selection support.
+*   **Output:** `onSelectionChanged` callback.
+
+**Source:** `frontend/lib/src/widgets/miner_list_view.dart`
+
+### 4.2 `ScannerControlPanel`
+**Purpose:** Network discovery interface.
+
+**Behavior:**
+*   **Input:** User-defined IP range (CIDR or "start-end").
+*   **Action:** Calls `start_scan` (Future-based), displays loading indicator.
+*   **Output:** Triggers `onScanComplete` callback with results.
+
+**Source:** `frontend/lib/src/widgets/scanner_control_panel.dart`
+
+### 4.3 `MinerDetailDialog`
+**Purpose:** Expanded view for individual miner inspection.
+
+**Behavior:**
+*   **Input:** Selected `Miner` object from `MinerListView`.
+*   **Displays:** 
+    *   **Performance:** RT vs Avg Hashrate, Uptime.
+    *   **Thermals:** Chip and PCB temperature grids (color-coded).
+    *   **Cooling:** Fan speeds (RPM).
+    *   **System Info:** Hardware model, Firmware version, Software version.
+    *   **Mining Pools:** List of active pools (1-3) with associated workers.
+*   **Actions:** Quick access to single-device commands (reboot, blink).
+
+**Source:** `frontend/lib/src/widgets/miner_detail_dialog.dart`
+
+### 4.4 `BatchActionBar`
+**Purpose:** Execute commands on multiple selected miners.
+
+**Behavior:**
+*   **Input:** List of selected miner IPs from `MinerListView`.
+*   **Actions:** Reboot, Blink LED (calls `execute_command()` bridge function).
+*   **Feedback:** Shows progress indicator and success/failure toast notifications.
+
+**Source:** `frontend/lib/src/widgets/batch_action_bar.dart` *(to be implemented)*
+
+## 5. CGMiner API Protocol Detail
 
 Communication is done by sending a JSON payload over a raw TCP socket.
 
@@ -107,39 +219,40 @@ Communication is done by sending a JSON payload over a raw TCP socket.
 Miners return a JSON object with a `STATUS` array and a data array (e.g., `SUMMARY`).
 *   **Edge Cases:** Antminer vs Whatsminer key differences ("MHS av" vs "HS 5s"), non-standard ports (4029/4030).
 
-## 5. Interface Layer (Flutter Bridge)
+## 6. Interface Layer (Flutter Bridge)
 
-We use `flutter_rust_bridge` to generate binding code. These functions define the **API boundary** between the UI and the Rust backend.
+We use `flutter_rust_bridge` to generate binding code. The `backend/src/api` module defines the **API boundary** between the UI and the Rust backend.
 
 ### Exposed Functions (Rust -> Dart)
 
+These functions are defined in the `backend/src/api` module:
+
 1.  **`start_scan`**
     *   **Input:** `ip_range: String` (CIDR or "start-end")
-    *   **Output:** `Stream<ScanEvent>`
-    *   **Events:** `Found(Miner)`, `Progress(f32)`, `Complete`
+    *   **Output:** `Vec<Miner>` (Waits for scan completion and returns all discovered miners)
 
-2.  **`subscribe_to_updates`**
-    *   **Input:** None
-    *   **Output:** `Stream<Vec<Miner>>` (Full state or diffs of the miner table)
+2.  **`start_monitoring`** (Stateful)
+    *   **Input:** `ips: Vec<String>`
+    *   **Output:** `()` (Starts background polling loop; updates are accessible via `get_current_miners`)
 
-3.  **`execute_command`**
+3.  **`execute_batch_command`**
     *   **Input:** `target_ips: Vec<String>`, `command: MinerCommand`
-    *   **Output:** `Result<()>` (Batches commands like Reboot or LED Blink)
+    *   **Output:** `Vec<CommandResult>` (Batch execution results per IP)
 
-## 6. Implementation Strategy
+## 7. Implementation Strategy
 
 1.  **Basic TCP Client:** Implement `client` module to handshake and parse JSON.
 2.  **The Scanner:** Implement `scanner` with `tokio::spawn` and timeouts.
 3.  **State Management:** Implement `monitor` loop (poll, update, broadcast).
 4.  **Integration:** Wire up `flutter_rust_bridge` to run Rust logic from Flutter.
 
-## 7. Performance Considerations
+## 8. Performance Considerations
 
 *   **Socket Limits:** Scanner must respect `ulimit -n` (batch requests).
 *   **Parsing Overhead:** Use `serde_json::from_slice` for efficiency.
 *   **Target:** Scan 254 IPs in <10s (Requires ~100 concurrent connections).
 
-## 8. Error Handling Strategy
+## 9. Error Handling Strategy
 
 **Error Categories:**
 *   **Timeout:** Connection unavailable.
@@ -151,27 +264,32 @@ We use `flutter_rust_bridge` to generate binding code. These functions define th
 *   **Rust → Flutter:** Errors are serialized as structured data via FFI.
 *   **UI:** Toast notifications for transient errors, dialogs for critical failures.
 
-## 9. Configuration Management
+## 10. Configuration Management
 
 **Key Configuration Parameters:**
-*   **Network:** `scan_timeout_ms` (Default: 1500ms), `max_concurrent_scans` (Default: 100).
+*   **Network:** `scan_timeout_ms` (Default: 2500ms), `max_concurrent_scans` (Default: 100).
 *   **Monitoring:** `poll_interval_ms` (Default: 10s), `retry_attempts`.
 *   **Thresholds:** `warning_temp_threshold` (85°C), `warning_hashrate_ratio` (90%).
 
 **Storage:** User preferences saved to `~/.bitlink/config.json`.
 
-## 10. Observability & Debugging
+## 11. Observability & Debugging
 
 *   **Logging:** `tracing` crate (ERROR, WARN, INFO, DEBUG).
 *   **Metrics:** Scan duration, active connections, success rates exposed via FFI.
 
-## 11. Testing Strategy
+## 12. Testing Strategy
 
 *   **Unit Tests:** Mock TCP responses for `client` and `scanner`.
 *   **Integration Tests:** End-to-end scan against mock miner servers.
 *   **Manual Testing:** `docker-compose` virtual network with simulated miners.
 
-## 12. Future Enhancements
+## 13. Platform Specifics (macOS)
+
+*   **App Sandbox:** Flutter apps on macOS run in a sandbox by default.
+*   **Entitlements:** The `com.apple.security.network.client` entitlement is **required** in `DebugProfile.entitlements` and `Release.entitlements` to allow the scanner to make outgoing TCP connections.
+
+## 14. Future Enhancements
 
 *   **Data Persistence:** SQLite for historical trends.
 *   **Alerts:** Desktop notifications.
