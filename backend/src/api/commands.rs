@@ -1,6 +1,6 @@
-use crate::client::{send_command, DEFAULT_PORT, DEFAULT_TIMEOUT_MS};
 use crate::api::models::{MinerCommand, CommandResult};
 use crate::core::MinerCredentials;
+
 
 /// Execute a command on multiple miners
 /// Returns results for each IP (success/failure)
@@ -56,8 +56,8 @@ async fn execute_single_command(ip: String, command: MinerCommand, credentials: 
             }
         }
         MinerCommand::BlinkLed => {
-            // BlinkLed still uses the CGMiner API (may also need HTTP in the future)
-            match send_command(&ip, DEFAULT_PORT, "locatedevice", DEFAULT_TIMEOUT_MS).await {
+            // Modern Antminers use HTTP API for blink control
+            match blink_led_via_http(&ip, &credentials.username, &credentials.password, true).await {
                 Ok(_) => CommandResult {
                     ip,
                     success: true,
@@ -66,7 +66,22 @@ async fn execute_single_command(ip: String, command: MinerCommand, credentials: 
                 Err(e) => CommandResult {
                     ip,
                     success: false,
-                    error: Some(e.to_string()),
+                    error: Some(e),
+                },
+            }
+        }
+        MinerCommand::StopBlink => {
+            // Modern Antminers use HTTP API for blink control
+            match blink_led_via_http(&ip, &credentials.username, &credentials.password, false).await {
+                Ok(_) => CommandResult {
+                    ip,
+                    success: true,
+                    error: None,
+                },
+                Err(e) => CommandResult {
+                    ip,
+                    success: false,
+                    error: Some(e),
                 },
             }
         }
@@ -130,6 +145,75 @@ async fn reboot_via_http(ip: &str, username: &str, password: &str) -> std::resul
             "Reboot request failed with status: {} (check credentials)",
             resp.status()
         ))
+    }
+}
+
+/// Blink LED via HTTP (POST /cgi-bin/blink.cgi)
+/// state: true for blink, false for stop
+async fn blink_led_via_http(ip: &str, username: &str, password: &str, state: bool) -> std::result::Result<(), String> {
+    let url = format!("http://{}/cgi-bin/blink.cgi", ip);
+    let client = reqwest::Client::new();
+    // Payload MUST be exactly `{"blink": true}` or `{"blink": false}`
+    let payload = format!(r#"{{"blink": {}}}"#, state);
+
+    // Step 1: Send initial request (likely to fail with 401, but might work)
+    let resp = client
+        .post(&url)
+        .header("Content-Type", "text/plain;charset=UTF-8")
+        .header("X-Requested-With", "XMLHttpRequest")
+        .header("Referer", format!("http://{}/", ip))
+        .body(payload.clone())
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    if resp.status().is_success() {
+        return Ok(());
+    }
+
+    if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
+        return Err(format!("Unexpected status: {}", resp.status()));
+    }
+
+    // Step 2: Extract WWW-Authenticate header
+    let www_auth = resp
+        .headers()
+        .get("www-authenticate")
+        .ok_or("Missing WWW-Authenticate header")?
+        .to_str()
+        .map_err(|e| format!("Invalid WWW-Authenticate header: {}", e))?
+        .to_string();
+
+    // Step 3: Compute Digest Auth
+    let mut context = digest_auth::AuthContext::new(username, password, "/cgi-bin/blink.cgi");
+    // Set method to POST (default is GET)
+    context.method = digest_auth::HttpMethod::POST;
+
+    let mut prompt = digest_auth::parse(&www_auth)
+        .map_err(|e| format!("Failed to parse digest challenge: {:?}", e))?;
+    let answer = prompt
+        .respond(&context) // digest_auth 0.3 uses context method
+        .map_err(|e| format!("Failed to compute digest response: {:?}", e))?;
+
+    // Step 4: Send authenticated request
+    let auth_header = answer.to_header_string();
+    let resp = client
+        .post(&url)
+        .header("Authorization", auth_header)
+        .header("Content-Type", "text/plain;charset=UTF-8")
+        .header("X-Requested-With", "XMLHttpRequest")
+        .header("Referer", format!("http://{}/", ip))
+        .body(payload.clone())
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| format!("Authenticated request failed: {}", e))?;
+
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!("Blink request failed with status: {}", resp.status()))
     }
 }
 
