@@ -3,6 +3,7 @@ import 'package:frontend/src/rust/frb_generated.dart';
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/widgets/scanner_control_panel.dart';
 import 'package:frontend/src/widgets/miner_list_view.dart';
+import 'package:frontend/src/widgets/settings_dialog.dart';
 
 Future<void> main() async {
   await RustLib.init();
@@ -51,12 +52,26 @@ class _MinerDashboardState extends State<MinerDashboard> {
     });
   }
 
+  void _openSettings() {
+    showDialog(
+      context: context,
+      builder: (context) => const SettingsDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bit-Link Miner Manager'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _openSettings,
+            tooltip: 'Settings',
+          ),
+        ],
       ),
       body: Column(
         children: [

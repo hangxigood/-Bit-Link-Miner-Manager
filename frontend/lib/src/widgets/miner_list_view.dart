@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
+import 'package:frontend/src/services/credentials_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MinerListView extends StatelessWidget {
@@ -69,7 +70,12 @@ class MinerListView extends StatelessWidget {
                   onSelectionChanged(newList);
                 },
                 onLongPress: () async {
-                  final url = Uri.parse('http://${miner.ip}');
+                  // Get credentials from settings
+                  final username = await CredentialsService.getUsername();
+                  final password = await CredentialsService.getPassword();
+                  
+                  // Embed credentials for auto-login (Digest Auth)
+                  final url = Uri.parse('http://$username:$password@${miner.ip}');
                   if (await canLaunchUrl(url)) {
                     await launchUrl(url, mode: LaunchMode.externalApplication);
                   } else {
