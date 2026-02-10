@@ -1,4 +1,4 @@
-use bitlink_miner_manager::{scan_range, ScanConfig, ScanEvent};
+use rust_lib_frontend::{scan_range, ScanConfig, ScanEvent};
 use std::time::Instant;
 
 #[tokio::main]

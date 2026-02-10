@@ -1,4 +1,4 @@
-use bitlink_miner_manager::{parse_ip_range, scan_range, ScanConfig, ScanEvent};
+use rust_lib_frontend::{parse_ip_range, scan_range, ScanConfig, ScanEvent};
 use std::time::Instant;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

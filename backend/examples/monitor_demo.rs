@@ -1,4 +1,4 @@
-use bitlink_miner_manager::{
+use rust_lib_frontend::{
     scan_range, start_monitor, MonitorConfig, MonitorEvent, ScanConfig, ScanEvent,
 };
 use std::time::Instant;
@@ -78,10 +78,10 @@ async fn main() {
                 
                 for miner in &miners {
                     let status_icon = match miner.status {
-                        bitlink_miner_manager::MinerStatus::Active => "✅",
-                        bitlink_miner_manager::MinerStatus::Warning => "⚠️ ",
-                        bitlink_miner_manager::MinerStatus::Dead => "❌",
-                        bitlink_miner_manager::MinerStatus::Scanning => "🔍",
+                        rust_lib_frontend::MinerStatus::Active => "✅",
+                        rust_lib_frontend::MinerStatus::Warning => "⚠️ ",
+                        rust_lib_frontend::MinerStatus::Dead => "❌",
+                        rust_lib_frontend::MinerStatus::Scanning => "🔍",
                     };
                     
                     let max_temp = miner.stats.temperature_chip.iter()

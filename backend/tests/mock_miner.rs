@@ -72,7 +72,7 @@ pub async fn start_mock_miner(port: u16) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitlink_miner_manager::{get_summary, DEFAULT_TIMEOUT_MS};
+    use rust_lib_frontend::{get_summary, DEFAULT_TIMEOUT_MS};
     use std::time::Duration;
     use tokio::time::sleep;
     

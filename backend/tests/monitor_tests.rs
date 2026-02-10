@@ -1,4 +1,4 @@
-use bitlink_miner_manager::{start_monitor, MonitorConfig, MonitorEvent, MinerStatus};
+use rust_lib_frontend::{start_monitor, MonitorConfig, MonitorEvent, MinerStatus};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

@@ -19,6 +19,19 @@ pub struct MinerStats {
     pub temperature_pcb: Vec<f64>,   // PCB temperatures (°C)
     pub fan_speeds: Vec<u32>,        // Fan speeds (RPM)
     pub uptime: u64,                 // Uptime in seconds
+    
+    // Detailed Info
+    pub pool1: Option<String>,
+    pub worker1: Option<String>,
+    pub pool2: Option<String>,
+    pub worker2: Option<String>,
+    pub pool3: Option<String>,
+    pub worker3: Option<String>,
+    
+    pub firmware: Option<String>,    // CompileTime formatted YYYYMMDD
+    pub software: Option<String>,    // "Bmminer X.X.X"
+    pub hardware: Option<String>,    // "uart_trans.X.X"
+    pub mac_address: Option<String>, // Keep this if we find it later
 }
 
 /// Status of a miner
@@ -39,6 +52,16 @@ impl Default for MinerStats {
             temperature_pcb: Vec::new(),
             fan_speeds: Vec::new(),
             uptime: 0,
+            pool1: None,
+            worker1: None,
+            pool2: None,
+            worker2: None,
+            pool3: None,
+            worker3: None,
+            firmware: None,
+            software: None,
+            hardware: None,
+            mac_address: None,
         }
     }
 }

@@ -1,11 +1,11 @@
-use bitlink_miner_manager::{get_summary, send_command, DEFAULT_PORT, DEFAULT_TIMEOUT_MS};
+use rust_lib_frontend::{get_summary, send_command, DEFAULT_PORT, DEFAULT_TIMEOUT_MS};
 
 #[tokio::main]
 async fn main() {
     println!("=== Bit-Link Miner Manager - Manual Test ===\n");
     
     // TODO: Replace with your actual miner IP
-    let miner_ip = "192.168.56.31"; // <-- CHANGE THIS
+    let miner_ip = "192.168.56.32"; // <-- CHANGE THIS
     let port = DEFAULT_PORT;
     
     println!("Attempting to connect to miner at {}:{}...", miner_ip, port);
@@ -39,6 +39,16 @@ async fn main() {
             println!("  Chip temps:     {:?}", stats.temperature_chip);
             println!("  PCB temps:      {:?}", stats.temperature_pcb);
             println!("  Fan speeds:     {:?}", stats.fan_speeds);
+            println!("  Pool 1:         {:?}", stats.pool1);
+            println!("  Worker 1:       {:?}", stats.worker1);
+            println!("  Pool 2:         {:?}", stats.pool2);
+            println!("  Worker 2:       {:?}", stats.worker2);
+            println!("  Pool 3:         {:?}", stats.pool3);
+            println!("  Worker 3:       {:?}", stats.worker3);
+            println!("  Hardware:       {:?}", stats.hardware);
+            println!("  Firmware:       {:?}", stats.firmware);
+            println!("  Software:       {:?}", stats.software);
+            println!("  MAC Address:    {:?}", stats.mac_address);
         }
         Err(e) => {
             eprintln!("✗ Failed to get summary: {}", e);

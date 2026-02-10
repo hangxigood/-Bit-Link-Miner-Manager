@@ -30,7 +30,7 @@ pub struct ScanConfig {
 impl Default for ScanConfig {
     fn default() -> Self {
         Self {
-            timeout_ms: 500,  
+            timeout_ms: 1000,  
             max_concurrent: 100,
             ports: vec![4028], //4028, 4029, 4030 when need to scan more ports
         }
