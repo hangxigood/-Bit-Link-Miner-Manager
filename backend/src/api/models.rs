@@ -6,6 +6,7 @@ pub use crate::core::{Miner, MinerStats, MinerStatus};
 pub enum MinerCommand {
     Reboot,
     BlinkLed,
+    StopBlink,
 }
 
 /// Result of a batch command execution
