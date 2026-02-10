@@ -1,47 +1,8 @@
-// The original content is temporarily commented out to allow generating a self-contained demo - feel free to uncomment later.
-
-// import 'package:flutter/material.dart';
-// import 'package:frontend/src/rust/api/simple.dart';
-// import 'package:frontend/src/rust/frb_generated.dart';
-//
-// Future<void> main() async {
-//   await RustLib.init();
-//   runApp(const MyApp());
-// }
-//
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: Scaffold(
-//         appBar: AppBar(title: const Text('Bit-Link Miner Manager')),
-//         body: Center(
-//           child: FutureBuilder<String>(
-//               future: greet(name: "Flutter"),
-//               builder: (context, snapshot) {
-//                 if (snapshot.hasData) {
-//                   return Text(
-//                     snapshot.data!,
-//                     style: const TextStyle(fontSize: 24),
-//                   );
-//                 } else if (snapshot.hasError) {
-//                   return Text('Error: ${snapshot.error}');
-//                 } else {
-//                   return const CircularProgressIndicator();
-//                 }
-//               }),
-//         ),
-//       ),
-//     );
-//   }
-// }
-//
-
 import 'package:flutter/material.dart';
-import 'package:frontend/src/rust/api/simple.dart';
 import 'package:frontend/src/rust/frb_generated.dart';
+import 'package:frontend/src/rust/core/models.dart';
+import 'package:frontend/src/widgets/scanner_control_panel.dart';
+import 'package:frontend/src/widgets/miner_list_view.dart';
 
 Future<void> main() async {
   await RustLib.init();
@@ -54,13 +15,60 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('flutter_rust_bridge quickstart')),
-        body: Center(
-          child: Text(
-            'Action: Call Rust `greet("Tom")`\nResult: `${greet(name: "Tom")}`',
-          ),
+      title: 'Bit-Link Miner Manager',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
         ),
+        useMaterial3: true,
+      ),
+      home: const MinerDashboard(),
+    );
+  }
+}
+
+class MinerDashboard extends StatefulWidget {
+  const MinerDashboard({super.key});
+
+  @override
+  State<MinerDashboard> createState() => _MinerDashboardState();
+}
+
+class _MinerDashboardState extends State<MinerDashboard> {
+  List<Miner> _miners = [];
+  List<String> _selectedMinerIps = [];
+
+  void _handleScanComplete(List<dynamic> miners) {
+    setState(() {
+      _miners = miners.cast<Miner>();
+    });
+  }
+
+  void _handleSelectionChanged(List<String> selectedIps) {
+    setState(() {
+      _selectedMinerIps = selectedIps;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Bit-Link Miner Manager'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: Column(
+        children: [
+          ScannerControlPanel(onScanComplete: _handleScanComplete),
+          Expanded(
+            child: MinerListView(
+              miners: _miners,
+              selectedIps: _selectedMinerIps,
+              onSelectionChanged: _handleSelectionChanged,
+            ),
+          ),
+        ],
       ),
     );
   }
