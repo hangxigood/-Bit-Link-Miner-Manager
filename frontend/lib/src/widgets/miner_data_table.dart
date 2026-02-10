@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/theme/app_theme.dart';
-import 'package:frontend/src/widgets/miner_detail_dialog.dart';
+import 'package:frontend/src/services/credentials_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MinerDataTable extends StatelessWidget {
   final List<Miner> miners;
@@ -198,11 +199,22 @@ class MinerDataTable extends StatelessWidget {
     final maxTemp = _getMaxTemp(miner.stats);
 
     return InkWell(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => MinerDetailDialog(miner: miner),
-        );
+      onTap: () async {
+        // Get credentials from settings
+        final username = await CredentialsService.getUsername();
+        final password = await CredentialsService.getPassword();
+        
+        // Embed credentials for auto-login (Digest Auth)
+        final url = Uri.parse('http://$username:$password@${miner.ip}');
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open http://${miner.ip}')),
+            );
+          }
+        }
       },
       child: Container(
         decoration: BoxDecoration(
