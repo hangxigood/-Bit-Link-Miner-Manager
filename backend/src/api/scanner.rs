@@ -12,7 +12,7 @@ pub async fn start_scan(ip_range: String) -> anyhow::Result<Vec<Miner>> {
     let config = ScanConfig::default();
     
     // Start the scan
-    let mut rx = scanner::scan_range(&ip_range, config).await?;
+    let mut rx: tokio::sync::mpsc::Receiver<scanner::ScanEvent> = scanner::scan_range(&ip_range, config).await?;
 
     
     // Collect all found miners
@@ -30,7 +30,7 @@ pub async fn start_scan(ip_range: String) -> anyhow::Result<Vec<Miner>> {
 /// Validate an IP range string without starting a scan
 pub fn validate_ip_range(range: String) -> Result<String, String> {
     match scanner::parse_ip_range(&range) {
-        Ok(ips) => Ok(format!("Valid range: {} IPs", ips.len())),
+        Ok(ips) => Ok(format!("Valid range: {} IPs", ips.len() as usize)),
         Err(e) => Err(format!("Invalid range: {}", e)),
     }
 }

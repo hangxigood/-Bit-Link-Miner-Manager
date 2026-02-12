@@ -196,13 +196,14 @@ pub async fn get_summary(
         }
     }
 
-    // 4. Get Version (Hardware/Firmware)
+    // 4. Get Version (Hardware/Firmware/Model)
     if let Ok(version_json) = send_command(ip, port, "version", timeout_ms).await {
         if let Ok(clean_json) = extract_json(&version_json) {
-            let (hw, fw, sw, _mac) = parse_version_data(&clean_json);
+            let (hw, fw, sw, model) = parse_version_data(&clean_json);
             stats.hardware = hw;
             stats.firmware = fw;
             stats.software = sw;
+            stats.model = model;
         }
     }
 
@@ -362,6 +363,7 @@ fn parse_summary_to_stats(summary: SummaryData) -> Result<MinerStats> {
         worker2: None,
         pool3: None,
         worker3: None,
+        model: None,
         firmware: None,
         software: None,
         hardware: None,
@@ -500,7 +502,10 @@ fn parse_version_data(json: &str) -> (Option<String>, Option<String>, Option<Str
                 // Software: "Bmminer " + "BMMiner" field
                 let software = v.bm_miner.as_ref().map(|s| format!("Bmminer {}", s));
                 
-                return (hardware, firmware, software, None); 
+                // Model: "Type" field (e.g. "Antminer S19")
+                let model = v._type.clone();
+                
+                return (hardware, firmware, software, model); 
             }
         }
     }

@@ -42,10 +42,10 @@ impl Default for MonitorConfig {
     }
 }
 
-/// Start monitoring a list of miner IPs
+/// Start monitoring a list of miners
 /// Returns a channel receiver that emits MonitorEvent updates
 pub async fn start_monitor(
-    ips: Vec<String>,
+    miners: Vec<Miner>,
     config: MonitorConfig,
 ) -> mpsc::Receiver<MonitorEvent> {
     let (tx, rx) = mpsc::channel(100);
@@ -54,16 +54,9 @@ pub async fn start_monitor(
     let state: Arc<DashMap<String, Miner>> = Arc::new(DashMap::new());
     
     // Initialize state with miners
-    for ip in ips {
-        // Create initial miner entry
-        let miner = Miner {
-            ip: ip.clone(),
-            model: None,
-            status: MinerStatus::Scanning,
-            stats: Default::default(),
-            last_updated: current_timestamp(),
-        };
-        state.insert(ip, miner);
+    for miner in miners {
+        // Use existing miner state
+        state.insert(miner.ip.clone(), miner);
     }
     
     // Spawn the polling loop
@@ -146,7 +139,8 @@ async fn poll_single_miner(
         
         match stats_result {
             Some(stats) => {
-                // Update stats
+                // Update stats and model
+                entry.model = stats.model.clone();
                 entry.stats = stats;
                 entry.last_updated = current_timestamp();
                 

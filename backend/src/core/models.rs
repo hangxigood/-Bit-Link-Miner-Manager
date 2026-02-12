@@ -28,6 +28,7 @@ pub struct MinerStats {
     pub pool3: Option<String>,
     pub worker3: Option<String>,
     
+    pub model: Option<String>,       // Miner model (e.g., "Antminer S19")
     pub firmware: Option<String>,    // CompileTime formatted YYYYMMDD
     pub software: Option<String>,    // "Bmminer X.X.X"
     pub hardware: Option<String>,    // "uart_trans.X.X"
@@ -58,6 +59,7 @@ impl Default for MinerStats {
             worker2: None,
             pool3: None,
             worker3: None,
+            model: None,
             firmware: None,
             software: None,
             hardware: None,

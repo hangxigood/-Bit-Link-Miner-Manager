@@ -10,12 +10,12 @@ lazy_static::lazy_static! {
     static ref CURRENT_MINERS: Arc<Mutex<Vec<Miner>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
-/// Start monitoring a list of miner IPs
+/// Start monitoring a list of miners
 /// This initializes the background polling loop
-pub async fn start_monitoring(ips: Vec<String>) -> anyhow::Result<()> {
+pub async fn start_monitoring(miners: Vec<Miner>) -> anyhow::Result<()> {
     let config = BackendMonitorConfig::default();
     
-    let rx = monitor::start_monitor(ips, config).await;
+    let rx = monitor::start_monitor(miners, config).await;
     
     // Store the receiver globally
     let mut guard = MONITOR_RX.lock().await;

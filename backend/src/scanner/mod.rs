@@ -30,7 +30,7 @@ pub struct ScanConfig {
 impl Default for ScanConfig {
     fn default() -> Self {
         Self {
-            timeout_ms: 1000,  
+            timeout_ms: 500,  
             max_concurrent: 100,
             ports: vec![4028], //4028, 4029, 4030 when need to scan more ports
         }
@@ -206,10 +206,13 @@ async fn scan_single_ip(ip: IpAddr, config: &ScanConfig) -> Option<Miner> {
             // Try to extract model from version response
             let model = extract_model_from_version(&version_response);
             
+            // Determine status based on stats
+            let status = determine_status_from_stats(&stats);
+            
             return Some(Miner {
                 ip: ip.to_string(),
                 model,
-                status: MinerStatus::Scanning,
+                status,
                 stats,
                 last_updated: SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -254,6 +257,25 @@ fn clean_json_response(response: &str) -> Option<String> {
     }
     
     None
+}
+
+/// Determine miner status based on stats
+fn determine_status_from_stats(stats: &crate::core::MinerStats) -> MinerStatus {
+    // Check temperature
+    let max_temp = stats.temperature_chip.iter()
+        .chain(stats.temperature_pcb.iter())
+        .fold(0.0_f64, |max, &temp| max.max(temp));
+    
+    if max_temp >= 85.0 {
+        return MinerStatus::Warning;
+    }
+    
+    // Check hashrate - if positive, it's Active
+    if stats.hashrate_avg > 0.0 {
+        MinerStatus::Active
+    } else {
+        MinerStatus::Warning
+    }
 }
 
 #[cfg(test)]
