@@ -48,12 +48,12 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
 ## 🟡 In Progress (v0.5 Rebranding & Enhancements)
 
 ### Rebranding (GreatTool)
-- [ ] **Name Change**: Update app title, window title, and "About" dialog to **GreatTool**.
-- [ ] **Theme Update**: Apply `greatpool.ca` palette:
-    - [ ] Primary: Teal (`#0DCBA3`).
-    - [ ] Background: Deep Navy (`#201C3D`).
-    - [ ] Text: Greyish Blue (`#515A6E`).
-    - [ ] **Toast Styling**: Implement custom `SnackBar` theme with semantic colors (Success/Error) and rounded design.
+- [x] **Name Change**: Update app title, window title, and "About" dialog to **GreatTool**.
+- [x] **Theme Update**: Apply `greatpool.ca` palette:
+    - [x] Primary: Teal (`#0DCBA3`).
+    - [x] Background: Deep Navy (`#201C3D`).
+    - [x] Text: Greyish Blue (`#515A6E`).
+    - [x] **Toast Styling**: Implement custom `SnackBar` theme with semantic colors (Success/Error) and rounded design.
 
 ### Enhanced Monitoring
 - [ ] **Data Grid**:
