@@ -56,7 +56,7 @@ class _MyAppState extends State<MyApp> {
       valueListenable: _themeModeNotifier,
       builder: (context, themeMode, _) {
         return MaterialApp(
-          title: 'MineControl',
+          title: 'GreatTool',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeMode,

@@ -79,7 +79,7 @@ class _HeaderBarState extends State<HeaderBar> with SingleTickerProviderStateMix
           
           // Title + badge
           Text(
-            'MineControl',
+            'GreatTool',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
