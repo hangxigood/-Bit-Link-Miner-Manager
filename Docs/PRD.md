@@ -1,163 +1,98 @@
-# PRD: "Bit-Link" Miner Manager
+# Product Requirements Document (PRD): "Bit-Link" Miner Manager
 
-## 1. Project Objective
-To build a high-performance, cross-platform desktop application that discovers, monitors, and manages Bitcoin ASIC miners (Antminer, Whatsminer, etc.) within a local network. The goal is to demonstrate proficiency in concurrency (Rust) and cross-platform UI (Flutter).
+## 1. Product Overview
+**Bit-Link** is a high-performance desktop application for discovering, monitoring, and managing Bitcoin ASIC miners on a local network. It is designed for high-density industrial environments (100–1000+ devices).
 
----
-
-## 2. Target Audience
-*   **Primary:** Mine operators who need to monitor hardware health and performance in real-time.
-*   **Environment:** Industrial warehouses with high-density networking and hardware (100–1000+ miners per facility).
-
----
-
-## 3. Core Features
-
-### Phase 1: Network Discovery (High Priority) ✅
-*   **IP Range Scanning:** User can input an IP range (e.g., `192.168.1.1-192.168.1.254` or CIDR `192.168.1.0/24`).
-*   **IP Range Management:** Support multiple saved IP ranges. Users can add (+), remove (−), and select which ranges to scan.
-*   **High-Speed Probing:** Multi-threaded/concurrent scanner checks for open port `4028` (CGMiner/BMiner API default).
-*   **Auto-Identification:** Identify miner model, firmware version, and MAC address upon connection.
-*   **Auto-Range Detection:** One-click feature to automatically detect and populate local network subnets where miners are active, eliminating manual IP entry.
-
-### Phase 2: Real-Time Monitoring (High Priority) ✅
-**Comprehensive Data Grid:**
-*   **Single View Philosophy:** All vital miner information is displayed directly in the main list view to allow rapid cross-comparison. No separate "Detail Dialogs" — operators get the full picture at a glance.
-*   **Columns:**
-    *   **Status:** Active (✅), Warning (⚠️), Dead (❌), Scanning (🔍).
-    *   **Identification:** IP Address, MAC Address, Model.
-    *   **Performance:** Hashrate RT, Hashrate Avg.
-    *   **Thermals:** Max Temp, Chip Temps, PCB Temps (detailed breakdown if space permits or on hover).
-    *   **Cooling:** Fan Speeds (RPMs).
-    *   **Uptime:** Session duration.
-    *   **Configuration:** Full Pool 1–3 URLs, Workers, Firmware Version.
-
-### Phase 3: Batch Control (Medium Priority) ✅
-*   **Reboot:** Send a reboot command to selected miners.
-*   **Blink LED:** Trigger the "Flash LED" command.
-*   **Safe Execution (Staggered Batching):** ✅
-    *   **Problem:** Rebooting or changing power modes on hundreds of miners simultaneously causes massive power surges/drops that can trip breakers.
-    *   **Solution:** Users can configure a **"Max Concurrent Operations"** limit (e.g., reboot 10 miners at a time) or a delay interval between batches. The system queues commands and executes them sequentially to smooth out power consumption.
-
-### Phase 4: Batch Configuration (Future — Medium Priority)
-*   **Pool Configuration Panel:** Dedicated area for setting Pool/Worker/Password.
-*   **Power Control:** LPM / Enhanced LPM modes.
-*   **Power Safety:** Staggered execution logic (defined in Phase 3) applies strictly to power control commands.
-*   **Overclock/Underclock:** Model-specific frequency profiles.
-
-### Phase 5: Data & Export (Future — Low Priority)
-*   **Export:** Export current miner list to CSV/Excel for record-keeping and reporting.
-*   **Auto-Import:** Import miner lists from file for quick setup.
-*   **Filter: "Only Success Miners"** — Toggle to show only responsive/active miners.
+**Core Philosophy:**
+1.  **Speed**: Scan thousands of IPs in seconds.
+2.  **Density**: "Single Pane of Glass" monitoring without drill-down navigation.
+3.  **Safety**: Staggered execution of power commands to prevent electrical surges.
 
 ---
 
-## 4. Technical Architecture
+## 2. Functional Requirements
 
-### Backend (The "Engine")
-*   **Language:** Rust (Edition 2021).
-*   **Async Runtime:** `tokio` for non-blocking I/O and scheduling.
-*   **Communication:**
-    *   **TCP Sockets:** Direct communication with miners via JSON-RPC over TCP.
-*   **Concurrency:** `tokio::spawn` tasks with semaphore-controlled concurrency for hundreds of concurrent connections.
-*   **Data Bridge:** `flutter_rust_bridge` (FFI) for type-safe communication with Flutter.
+### 2.1 Feature: Network Discovery
+**Goal:** Identify all active miners on the network, regardless of their current IP configuration.
 
-### Frontend (The "Cockpit")
-*   **Framework:** Flutter for Desktop (macOS/Windows/Linux).
-*   **State Management:** `Provider` or `Riverpod` for real-time stream updates from the backend.
-*   **Components:**
-    *   `DataTable` / `DataGrid` for the miner list.
-    *   Scanner control panel with IP range input.
-    *   Detail dialog for individual miner inspection.
-    *   Batch action bar for multi-select operations.
+*   **IP Range Scanning**:
+    *   **Input**: The system accepts CIDR notation (e.g., `192.168.1.0/24`) or Range notation (`192.168.1.1-192.168.1.254`).
+    *   **Logic**: The system attempts TCP connections on port **4028** (standard CGMiner port).
+    *   **Concurrency**: Scans are performed in parallel with a configurable concurrency limit (default: 100) to ensure speed without flooding the network.
 
----
+*   **Auto-Range Detection**:
+    *   **Trigger**: User clicks "Auto" in the range input section.
+    *   **Behavior**: The system enumerates all local network interfaces and automatically populates the scan input with the local subnets (e.g., if the machine is `10.0.0.5/24`, it adds `10.0.0.0/24`).
 
-## 5. UI/UX Requirements
+*   **Device Identification**:
+    *   Upon successful TCP handshake, the system queries the miner for:
+        *   **Make/Model** (e.g., Antminer S19, Whatsminer M30S)
+        *   **MAC Address** (Unique Identifier)
+        *   **Firmware Version**
 
-### 5.1 Visual Design
-*   **Dark Mode First:** Default dark theme — standard for engineering/monitoring tools. Easier on the eyes during extended warehouse shifts and low-light environments.
-*   **Color System:**
-    *   **Status Colors:** Green (healthy), Orange (warning), Red (critical/dead), Blue (scanning).
-    *   **Temperature Gradient:** Green → Orange → Red based on thermal thresholds.
-    *   **Accent Color:** Deep purple/blue for interactive elements (buttons, selection highlights).
-*   **Typography:**
-    *   Monospaced or semi-monospaced numbers for hashrates, temperatures, and IPs — ensures column alignment.
-    *   Bold IP addresses for quick visual scanning.
-    *   Smaller font (12px) for secondary info (MACs, firmware, pool URLs) to reduce clutter.
+### 2.2 Feature: Real-Time Monitoring
+**Goal:** Provide a live, sortable, filterable view of the entire fleet's health.
 
-### 5.2 Layout & Information Architecture
-*   **Three-Zone Layout:**
-    1.  **Top Bar:** App title + global actions (Settings).
-    2.  **Control Panel:** Collapsible scanner input + batch config area. Should minimize when not in use to maximize table space.
-    3.  **Data Table:** Takes up the majority of screen real estate. Full-width, horizontally scrollable.
-*   **Status Bar (Bottom):** Summary strip showing: `Total: X | Active: X | Warning: X | Offline: X | Selected: X` — always visible for at-a-glance fleet health.
-*   **Information Density:** Optimize for "scan and compare" workflows — operators glance across rows to spot outliers, not read individual cells carefully.
+*   **Data Grid View**: active miners are displayed in a high-density table.
+    *   **No Drill-Down**: All critical metrics (Hashrate, Temp, Fans) are visible in the row.
+    *   **Sorting**: Clicking headers sorts the list by that metric.
 
-### 5.3 Interactions
-*   **Row Selection:** Checkbox-based multi-select for batch operations. Shift-click for range selection.
-*   **No "Drill-Down":** Avoid navigating away from the list. All data is surface-level.
-*   **Long Press → Web UI:** Long-press or right-click on a row opens the miner's HTTP management interface in the browser.
-*   **Column Sorting:** Click column headers to sort ascending/descending.
-*   **Search & Filter Bar:** Text search by IP, model, or worker name. Quick toggle filters: "Active Only", "Warnings Only".
+*   **Miner Status Definitions**:
+    The system assigns one of the following states to each device:
+    *   **🟢 Active**: Responding to API, Hashrate > 90% of target, Temps < 85°C.
+    *   **⚠️ Warning**: Responding, but Hashrate < 90% OR Temp > 85°C OR Fan Speed < 1000 RPM.
+    *   **🔴 Dead/Offline**: Failed to respond to 3 consecutive API polls.
+    *   **🔵 Scanning**: Discovery in progress.
 
-### 5.4 Responsiveness & Performance
-*   **Non-Blocking UI:** The UI must never freeze during network scans.
-*   **Progress Feedback:** Real-time counter of active scans.
-*   **Staggered Execution Feedback:** visual progress bar showing the progress of batch operations (e.g. "Rebooting: 20/50 complete").
-*   **Minimum Window Size:** 1024×768.
+*   **Polling Loop**:
+    *   The system polls all known IPs at a configurable interval (Default: 10s).
+    *   State changes (diffs) are broadcast to the UI immediately.
 
-### 5.5 Scannability (High-Density Layout)
-*   **Wide Table Support:** The UI must support horizontal scrolling for 15+ columns.
-*   **Compact Rows:** Minimized whitespace to show maximum miners per screen height.
-*   **Visual Anchors:** Bold IP addresses and color-coded Status icons to help the eye traverse long rows.
-*   **Sticky Headers:** Column headers remain visible while scrolling.
+### 2.3 Feature: Batch Operations & Safety
+**Goal:** Execute commands on multiple miners without causing infrastructure failure.
 
----
+*   **Batch Selection**: Users can select miners via checkboxes:
+    *   **Range Select**: Shift+Click to select a block of rows.
+    *   **Select All/None**: Global toggle.
 
-## 6. Success Metrics for the Demo
-*   **Speed:** Scan 254 IPs in under 10 seconds.
-*   **Stability:** No crashes when encountering non-miner hardware on the network.
-*   **Accuracy:** Hashrate shown in the tool matches the miner's web dashboard.
-*   **Usability:** An operator can identify all unhealthy miners in a 100-device fleet within 5 seconds of scan completion.
+*   **Commands**:
+    *   **Reboot**: Restarts the mining software/hardware.
+    *   **Blink LED**: Flashes the physical locator LED for maintenance.
+    *   **Pool Config** (Future): Sets Stratum URL and Worker User/Pass.
+
+*   **🚨 Safety: Staggered Execution**:
+    *   **Problem**: Rebooting 500 miners at once causes a massive power surge (inrush current) that can trip breakers.
+    *   **Requirement**: For power-intensive commands (Reboot, Power Mode), the system **MUST** offer a "Staggered" mode.
+    *   **Logic**:
+        1.  User selects N miners.
+        2.  System prompts for **Batch Size** (e.g., 10) and **Delay** (e.g., 5s).
+        3.  System executes command on first 10 -> Waits 5s -> Executes on next 10.
+        4.  Progress (Success/Fail count) is shown in a modal dialog.
+        5.  User can **Cancel** the remaining queue at any time.
 
 ---
 
-## 7. Roadmap
+## 3. UI/UX Requirements
 
-### Completed (v0.1 — Weeks 1–2)
-| Focus | Status |
-| :--- | :--- |
-| TCP scanner with concurrent probing | ✅ Done |
-| CGMiner JSON-RPC client (summary, stats, pools, version) | ✅ Done |
-| Flutter ↔ Rust FFI bridge via `flutter_rust_bridge` | ✅ Done |
-| Main dashboard data table with sortable columns | ✅ Done |
-| Scanner control panel with IP range input | ✅ Done |
-| Miner detail data logic (thermals, fans, pools, system info) | ✅ Done (UI Deprecated) |
-| Batch commands: Reboot + Blink LED | ✅ Done |
-| Auto-identification: model, firmware, MAC address | ✅ Done |
+### 3.1 Visual Language
+*   **Theme**: Dark Mode only (Industrial standard).
+*   **Color Coding**:
+    *   **Hashrate**: White (Normal), Red (Low).
+    *   **Temp**: Green (<70°C), Orange (70-85°C), Red (>85°C).
+*   **Density**:
+    *   Row height should be minimized to fit maximum devices on screen.
+    *   Font should be monospaced for all numerical data to ensure alignment.
 
-### Next (v0.2 — UI/UX Polish)
-| Focus | Priority |
-| :--- | :--- |
-| Status bar with fleet summary counts | High |
-| Color-coded row backgrounds for warnings/dead miners | High |
-| Column sorting (clickable headers) | High |
-| Search/filter bar (IP, model, worker) | Medium |
-| Sticky column headers | Medium |
-| Collapsible scanner panel | Medium |
-| Real-time scan progress (count updates) | Medium |
-| **Staggered Batch Execution Logic** | ✅ Done |
-| **Wide Data Grid (All Columns)** | **High** |
+### 3.2 Layout Structure
+*   **Sidebar**: Contains configuration (Ranges, Pools, Global Settings). Collapsible.
+*   **Main Area**: The Data Grid.
+*   **Status Bar**: Global counters (Total, Online, Offline, Network Hashrate).
+*   **Action Bar**: Context-aware buttons that appear when rows are selected.
 
-### Future (v0.3+ — Advanced Features)
-| Focus | Priority |
-| :--- | :--- |
-| Batch pool configuration panel | High |
-| IP range list management (+/− saved ranges) | Medium |
-| Export to CSV | Medium |
-| Auto-refresh / monitoring loop integration | Medium |
-| Power control (LPM toggling) | Low |
-| Overclock/underclock profiles | Low |
-| Historical data & trend charts | Low |
-| Desktop notifications for alerts | Low |
+---
+
+## 4. Non-Functional Requirements
+*   **Platform**: macOS, Windows, Linux (via Flutter).
+*   **Performance**: UI must typically render at 60fps even with 1000+ rows updating every 10s.
+*   **Network**: The scanner must respect OS file descriptor limits (using semaphores) to prevent crashing the network stack.
+*   **Sandboxing**: On macOS, the App Sandbox must be configured to allow outgoing TCP connections (`com.apple.security.network.client`).
