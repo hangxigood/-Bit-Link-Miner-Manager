@@ -43,6 +43,18 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
 - [x] **Refactor Docs**: Converted PRD/Tech Design to "Source of Truth" (Removed ephemeral status).
 - [x] **Protocol Specs**: Documented parsing logic in Appendix A.
 
+### Phase 3.5: Data Grid Enhancements (New)
+- [x] **Data Grid**:
+    - [x] **Reorderable Columns**: Settings Dialog with drag-and-drop.
+    - [x] **Persistence**: Saved column visibility/order (shared_preferences).
+    - [x] **Locate Toggle**: Boolean switch column (Blink ON/OFF).
+    - [x] **Fan Speed Display**: Fixed width/formatting with fit-to-content.
+- [x] **Temperature Data**:
+    - [x] Split into `Inlet Temp` and `Outlet Temp` columns.
+    - [x] Formatted as `40 | 42 | 41`.
+- [x] **UX Improvements**:
+    - [x] **Auto Scan Button**: Renamed to "Detect".
+
 ---
 
 ## 🟡 In Progress (v0.5 Rebranding & Enhancements)
@@ -55,17 +67,7 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
     - [x] Text: Greyish Blue (`#515A6E`).
     - [x] **Toast Styling**: Implement custom `SnackBar` theme with semantic colors (Success/Error) and rounded design.
 
-### Enhanced Monitoring
-- [ ] **Data Grid**:
-    - [ ] **Reorderable Columns**: Implement drag-and-drop for column headers.
-    - [ ] **Persistence**: Save column order to local storage (shared_preferences).
-    - [ ] **Locate Toggle**: Replace logic with boolean switch column (Blink ON/OFF).
-    - [ ] **Fan Speed Display**: Fix column width/formatting (currently truncates like `5280 |...`).
-- [ ] **Temperature Data**:
-    - [ ] Split into `Inlet Temp` and `Outlet Temp` columns.
-    - [ ] Format: `40 | 42 | 41` (Show all boards).
-- [ ] **UX Improvements**:
-    - [ ] **Auto Scan Button**: Rename "Auto" to "Detect" or "Fresh" to clarify intent.
+
 
 ### Testing
 - [ ] **Frontend Widget Tests**: Create `MinerDataTable` test suite to verify rendering without backend.

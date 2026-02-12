@@ -3,6 +3,7 @@ import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/widgets/dashboard_shell.dart';
 import 'package:frontend/src/widgets/action_bar.dart';
 import 'package:frontend/src/widgets/filter_toolbar.dart';
+import 'package:frontend/src/widgets/column_settings_dialog.dart';
 import 'package:frontend/src/widgets/miner_data_table.dart';
 
 class MainContent extends StatelessWidget {
@@ -26,6 +27,9 @@ class MainContent extends StatelessWidget {
   final Function(bool) onMonitorToggle;
   final Function(String) onShowToast;
   final Future<List<Miner>> Function() onTriggerScan;
+  final List<DataColumnConfig> visibleColumns;
+  final Set<String> blinkingIps;
+  final Function(String ip, bool isBlinking) onBlinkToggle;
 
   const MainContent({
     super.key,
@@ -49,6 +53,9 @@ class MainContent extends StatelessWidget {
     required this.onMonitorToggle,
     required this.onShowToast,
     required this.onTriggerScan,
+    required this.visibleColumns,
+    required this.blinkingIps,
+    required this.onBlinkToggle,
   });
 
   @override
@@ -83,6 +90,9 @@ class MainContent extends StatelessWidget {
             pageSize: pageSize,
             totalItems: totalItems,
             onPageChanged: onPageChanged,
+            visibleColumns: visibleColumns,
+            blinkingIps: blinkingIps,
+            onBlinkToggle: onBlinkToggle,
           ),
         ),
       ],

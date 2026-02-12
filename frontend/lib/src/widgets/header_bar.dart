@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/src/theme/app_theme.dart';
 import 'package:frontend/src/widgets/settings_dialog.dart';
+import 'package:frontend/src/widgets/column_settings_dialog.dart';
 
 class HeaderBar extends StatefulWidget {
   final VoidCallback onToggleSidebar;
   final VoidCallback onToggleTheme;
+  final VoidCallback onShowColumnSettings;
   final int onlineCount;
   final int totalCount;
   final double totalHashrate;
@@ -13,6 +15,7 @@ class HeaderBar extends StatefulWidget {
     super.key,
     required this.onToggleSidebar,
     required this.onToggleTheme,
+    required this.onShowColumnSettings,
     required this.onlineCount,
     required this.totalCount,
     required this.totalHashrate,
@@ -200,6 +203,18 @@ class _HeaderBarState extends State<HeaderBar> with SingleTickerProviderStateMix
               foregroundColor: context.mutedText,
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               minimumSize: Size(0, 28),
+            ),
+          ),
+          
+          // Columns
+          IconButton(
+            icon: Icon(Icons.view_column, size: 18),
+            onPressed: widget.onShowColumnSettings,
+            tooltip: 'Column Settings',
+            padding: EdgeInsets.all(8),
+            constraints: BoxConstraints(),
+            style: IconButton.styleFrom(
+              foregroundColor: context.mutedText,
             ),
           ),
           

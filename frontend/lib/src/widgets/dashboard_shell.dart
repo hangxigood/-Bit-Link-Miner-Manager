@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:frontend/src/rust/api/models.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/widgets/header_bar.dart';
@@ -6,6 +8,9 @@ import 'package:frontend/src/widgets/sidebar.dart';
 import 'package:frontend/src/widgets/sidebar/ip_ranges_section.dart';
 import 'package:frontend/src/widgets/main_content.dart';
 import 'package:frontend/src/rust/api/monitor.dart';
+import 'package:frontend/src/rust/api/commands.dart';
+import 'package:frontend/src/widgets/column_settings_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardShell extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -24,6 +29,13 @@ class _DashboardShellState extends State<DashboardShell> {
   List<Miner> _miners = [];
   List<String> _selectedMinerIps = [];
   
+  // Column Persistence & Configuration
+  List<DataColumnConfig> _columns = [];
+  bool _isLoadingColumns = true;
+  
+  // Locate / Blink state
+  Set<String> _blinkingIps = {};
+  
   // UI state
   bool _isSidebarCollapsed = false;
   bool _isScanning = false;
@@ -41,8 +53,95 @@ class _DashboardShellState extends State<DashboardShell> {
   // Pagination state
   int _currentPage = 0;
   int _pageSize = 50;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadColumnSettings();
+  }
 
-  List<Miner> get _filteredMiners {
+  Future<void> _loadColumnSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString('miner_table_columns_v1');
+      
+      if (jsonStr != null) {
+        final List<dynamic> jsonList = jsonDecode(jsonStr);
+        final loaded = jsonList.map((e) => DataColumnConfig(
+          id: e['id'],
+          label: e['label'],
+          visible: e['visible'],
+        )).toList();
+        
+        setState(() {
+          _columns = loaded;
+          _isLoadingColumns = false;
+        });
+      } else {
+        _resetColumns();
+      }
+    } catch (e) {
+      _resetColumns();
+    }
+  }
+  
+  Future<void> _saveColumnSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _columns.map((c) => {
+        'id': c.id,
+        'label': c.label,
+        'visible': c.visible,
+      }).toList();
+      await prefs.setString('miner_table_columns_v1', jsonEncode(jsonList));
+    } catch (e) {
+      // Ignore save errors
+    }
+  }
+  
+  void _resetColumns() {
+    setState(() {
+      _columns = [
+        DataColumnConfig(id: 'ip', label: 'IP Address', visible: true),
+        DataColumnConfig(id: 'status', label: 'Status', visible: true),
+        DataColumnConfig(id: 'locate', label: 'Locate', visible: true),
+        DataColumnConfig(id: 'model', label: 'Model', visible: true),
+        DataColumnConfig(id: 'hashrate_rt', label: 'RT Hash', visible: true),
+        DataColumnConfig(id: 'hashrate_avg', label: 'Avg Hash', visible: false),
+        DataColumnConfig(id: 'temp_in', label: 'Inlet Temp', visible: true),
+        DataColumnConfig(id: 'temp_out', label: 'Outlet Temp', visible: true),
+        DataColumnConfig(id: 'fan', label: 'Fans', visible: true),
+        DataColumnConfig(id: 'uptime', label: 'Uptime', visible: true),
+        DataColumnConfig(id: 'pool1', label: 'Pool 1', visible: true),
+        DataColumnConfig(id: 'worker1', label: 'Worker 1', visible: true),
+        DataColumnConfig(id: 'mac', label: 'MAC Addr', visible: false),
+        DataColumnConfig(id: 'firmware', label: 'Firmware', visible: false),
+        DataColumnConfig(id: 'software', label: 'Software', visible: false),
+        DataColumnConfig(id: 'hardware', label: 'Hardware', visible: false),
+      ];
+      _isLoadingColumns = false;
+    });
+    _saveColumnSettings(); // Save defaults
+  }
+  
+  void _openColumnSettings() {
+    showDialog(
+      context: context,
+      builder: (context) => ColumnSettingsDialog(
+        currentColumns: _columns,
+        onApply: (newColumns) {
+          setState(() {
+            _columns = newColumns;
+          });
+          _saveColumnSettings();
+        },
+        onReset: _resetColumns,
+      ),
+    );
+  }
+
+  // ... Filter/Sort getters ...
+    List<Miner> get _filteredMiners {
     return _miners.where((m) {
       // Text search
       if (_searchQuery.isNotEmpty) {
@@ -97,6 +196,12 @@ class _DashboardShellState extends State<DashboardShell> {
         case 'uptime':
           comparison = a.stats.uptime.compareTo(b.stats.uptime);
           break;
+        case 'locate':
+          // Sor by blink status
+          final aBlink = _blinkingIps.contains(a.ip) ? 1 : 0;
+          final bBlink = _blinkingIps.contains(b.ip) ? 1 : 0;
+          comparison = aBlink.compareTo(bBlink);
+          break;
       }
       
       return _sortAscending ? comparison : -comparison;
@@ -113,6 +218,8 @@ class _DashboardShellState extends State<DashboardShell> {
     if (start >= sorted.length) return [];
     return sorted.sublist(start, end);
   }
+
+  // ... Event Handlers ...
 
   void _handleScanComplete(List<Miner> miners) {
     setState(() {
@@ -197,18 +304,14 @@ class _DashboardShellState extends State<DashboardShell> {
   void _stopMonitorPolling() {
     _monitorTimer?.cancel();
     _monitorTimer = null;
-    // Call stopMonitoring asynchronously without awaiting to avoid UI freeze
-    stopMonitoring().catchError((e) {
-      // Silently handle errors
-    });
+    // Call stopMonitoring asynchronously
+    stopMonitoring().catchError((e) {});
   }
 
   Future<void> _fetchMonitoredMiners() async {
     try {
       final miners = await getCurrentMiners();
       if (mounted && _isMonitoring) {
-        // Only update if we have data, or if we're replacing with a non-empty list
-        // This keeps existing data visible until new data arrives
         if (miners.isNotEmpty || _miners.isEmpty) {
           setState(() {
             _miners = miners;
@@ -216,7 +319,39 @@ class _DashboardShellState extends State<DashboardShell> {
         }
       }
     } catch (e) {
-      // Silently handle errors during polling
+      // Silently handle errors
+    }
+  }
+  
+  Future<void> _handleBlinkToggle(String ip, bool shouldBlink) async {
+    // Optimistic UI update
+    setState(() {
+      if (shouldBlink) {
+        _blinkingIps.add(ip);
+      } else {
+        _blinkingIps.remove(ip);
+      }
+    });
+    
+    // Execute command
+    try {
+      if (shouldBlink) {
+        await executeBatchCommand(targetIps: [ip], command: MinerCommand.blinkLed);
+      } else {
+        await executeBatchCommand(targetIps: [ip], command: MinerCommand.stopBlink);
+      }
+    } catch (e) {
+      // Revert if failed
+      if (mounted) {
+        setState(() {
+          if (shouldBlink) {
+            _blinkingIps.remove(ip);
+          } else {
+            _blinkingIps.add(ip);
+          }
+        });
+        _showToast('Failed to toggle locate: $e');
+      }
     }
   }
 
@@ -243,6 +378,12 @@ class _DashboardShellState extends State<DashboardShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingColumns) {
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
     final totalMiners = _filteredMiners.length;
     final onlineMiners = _filteredMiners.where((m) => m.status == MinerStatus.active).length;
     final totalHashrate = _filteredMiners.fold<double>(
@@ -256,6 +397,7 @@ class _DashboardShellState extends State<DashboardShell> {
           HeaderBar(
             onToggleSidebar: _toggleSidebar,
             onToggleTheme: widget.onToggleTheme,
+            onShowColumnSettings: _openColumnSettings,
             onlineCount: onlineMiners,
             totalCount: totalMiners,
             totalHashrate: totalHashrate,
@@ -292,6 +434,9 @@ class _DashboardShellState extends State<DashboardShell> {
                     onMonitorToggle: _handleMonitorToggle,
                     onShowToast: _showToast,
                     onTriggerScan: _triggerScan,
+                    visibleColumns: _columns,
+                    blinkingIps: _blinkingIps,
+                    onBlinkToggle: _handleBlinkToggle, // Pass the row handler
                   ),
                 ),
               ],

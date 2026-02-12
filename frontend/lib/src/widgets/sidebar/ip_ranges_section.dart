@@ -211,8 +211,8 @@ class IpRangesSectionState extends State<IpRangesSection> {
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Icon(Icons.cloud_download, size: 14),
-              label: Text(_isDetecting ? 'Detecting...' : 'Auto'),
+                  : Icon(Icons.travel_explore, size: 14), // Changed icon to represent discovery
+              label: Text(_isDetecting ? 'Detecting...' : 'Detect'),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: Size(0, 24),
