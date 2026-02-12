@@ -18,6 +18,7 @@ To build a high-performance, cross-platform desktop application that discovers, 
 *   **IP Range Management:** Support multiple saved IP ranges. Users can add (+), remove (−), and select which ranges to scan.
 *   **High-Speed Probing:** Multi-threaded/concurrent scanner checks for open port `4028` (CGMiner/BMiner API default).
 *   **Auto-Identification:** Identify miner model, firmware version, and MAC address upon connection.
+*   **Auto-Range Detection:** One-click feature to automatically detect and populate local network subnets where miners are active, eliminating manual IP entry.
 
 ### Phase 2: Real-Time Monitoring (High Priority) ✅
 **Comprehensive Data Grid:**

@@ -96,6 +96,7 @@ The Rust codebase (crate: `rust_lib_frontend`) is organized into distinct module
 *   **Concurrency:** Uses a semaphore to limit concurrent open file descriptors (batch processing).
 *   **Output:** Stream of found devices.
 *   **Enhanced Parsing:** The scanner/monitor now intelligently chains multiple commands (`summary`, `stats`, `pools`, `version`) to build a complete device profile, handling model-specific quirks (e.g., Antminer vs Whatsminer hashrate formats).
+*   **Local Auto-Detection:** Enumerates local network interfaces to automatically suggest scan ranges using the `network-interface` crate.
 
 **Source:** [backend/src/scanner/mod.rs](../backend/src/scanner/mod.rs)
 
@@ -153,135 +154,82 @@ pub fn get_scan_progress() -> (u32, u32, bool) { ... }
 
 ## 4. Flutter UI Components
 
-The frontend is organized into reusable widgets that consume data from the Rust backend via FFI streams.
+The frontend uses a dashboard layout with a collapsible sidebar and a central data table, built with reusable widgets consuming Rust FFI streams.
 
-### Component Dependency Graph
+### Component Structure
 
 ```text
     +-----------------------------------------------------------+
-    |                     MinerDashboard                        |
-    |  (State: List<Miner>, SelectedIPs, Search, Filters, Sort) |
-    +-----+-----------+------------+------------+---------------+
-          |           |            |            |
-  +-------v--------+  |  +---------v---------+ |  +------------v-----+
-  |ScannerControl  |  |  | SearchFilterBar   | |  |  BatchActionBar  |
-  |Panel           |  |  | (Text + Toggles)  | |  |  (Bulk Actions)  |
-  |(Collapsible)   |  |  +-------------------+ |  +------------------+
-  +----------------+  |                        |
-                +-----v------------------------v---+
-                |         MinerListView            |
-                |  (Sortable, Color-coded rows,    |
-                |   Sticky headers, Wide grid)     |
-                +----------------------------------+
-                                |
-                         +------v------+
-                         | MinerDetail |
-                         |   Dialog    |
-                         +-------------+
+    |                    HeaderBar (Top)                        |
+    | (Sidebar Toggle | Title | Online/Total Stats | Settings)  |
     +-----------------------------------------------------------+
-    |                      StatusBar                            |
-    |   Total: X | Active: X | Warning: X | Offline: X | Sel: X|
-    +-----------------------------------------------------------+
+    |           |                                               |
+    |  Sidebar  |             Main Content Area                 |
+    |  (Left)   |                                               |
+    |           |    +-------------------------------------+    |
+    | Sections: |    |           ActionBar (Top)           |    |
+    | - Scan    |    | (Scan/Monitor | Reboot | Locate)    |    |
+    | - Pools   |    +-------------------------------------+    |
+    | - Power   |    |                                     |    |
+    |           |    |           MinerDataTable            |    |
+    |           |    |     (Sortable, Multi-select,        |    |
+    |           |    |      Comprehensive Columns)         |    |
+    |           |    |                                     |    |
+    |           |    +-------------------------------------+    |
+    |           |    |        Footer (Pagination)          |    |
+    +-----------+----+-------------------------------------+----+
 ```
 
-### 4.1 `MinerListView` (Main Screen)
-**Purpose:** Displays all discovered miners in a sortable data table.
+### 4.1 `MinerDataTable` (Main Screen)
+**Purpose:** Displays comprehensive metrics for all discovered miners in a dense, interactive table.
 
 **Behavior:**
-*   **Input:** `List<Miner>`
-*   **Features:** Sortable columns (Status, IP, Model, Hashrate RT, Max Temp, Pool, Worker), selection support.
-*   **Output:** `onSelectionChanged` callback.
+*   **Columns:** Status, IP, MAC, Model, Hashrate (RT/Avg), Temps (Max), Fan Speeds, Uptime, Pools/Workers, Firmware/Hardware.
+*   **Features:**
+    *   **Sorting:** All columns are sortable.
+    *   **Selection:** Multi-select checkboxes for batch operations.
+    *   **Interaction:** Tapping a row launches the miner's web interface (automatically handling HTTP Digest Auth).
+    *   **Footer:** Pagination controls and selection summaries.
 
-**Source:** `frontend/lib/src/widgets/miner_list_view.dart`
+**Source:** `frontend/lib/src/widgets/miner_data_table.dart`
 
-### 4.1.1 Color-Coded Row Backgrounds [Implemented]
-Rows are tinted based on the miner's status:
-*   **Active:** Default (no tint)
-*   **Warning:** `Colors.orange.withOpacity(0.1)`
-*   **Dead:** `Colors.red.withOpacity(0.15)`
-*   **Scanning:** `Colors.blue.withOpacity(0.08)`
+### 4.2 `Sidebar`
+**Purpose:** Contains configuration and control panels organized into collapsible sections.
 
-### 4.1.2 Column Sorting [Implemented]
-**State:** `_sortColumnIndex`, `_sortAscending`
-**Sortable Columns:** Status, IP, Model, Hashrate RT, Hashrate Avg, Max Temp, Uptime.
-**Logic:** `DataColumn.onSort` triggers a state update and resorting of the local list.
+**Source:** `frontend/lib/src/widgets/sidebar/`
 
-### 4.1.3 Wide Data Grid Polish [Partially Implemented]
-*   **Minimum column widths:** [Partially Implemented] - Basic logic exists.
-*   **Monospaced numbers:** [NOT IMPLEMENTED] - Should apply `fontFamily: 'monospace'` to numeric cells.
-*   **Frozen left columns:** [NOT IMPLEMENTED] - Status and IP columns should remain visible while scrolling horizontally.
+#### 4.2.1 `IPRangesSection`
+*   **Function:** Input for defining scan targets (CIDR or "start-end" ranges).
+*   **Auto-Detect:** "Auto" button triggers `detect_local_ranges()` to automatically discover and populate local network subnets, eliminating manual entry.
 
-### 4.1.4 Sticky Column Headers [NOT IMPLEMENTED]
-**Requirement:** Split the `DataTable` into a fixed header row and a scrollable body to keep headers visible while vertically scrolling.
+#### 4.2.2 `PoolConfigSection`
+*   **Function:** Batch configuration for up to 3 mining pools.
+*   **Features:** Includes "Worker Suffix" logic (`IP`, `No Change`, `Empty`) to automatically format worker names based on the miner's IP.
 
-### 4.2 `ScannerControlPanel`
-**Purpose:** Network discovery interface.
+#### 4.2.3 `PowerControlSection`
+*   **Function:** Quick access to power commands (Reboot, Sleep) for selected miners.
 
-**Behavior:**
-*   **Input:** User-defined IP range (CIDR or "start-end").
-*   **Action:** Calls `start_scan` (Future-based), displays loading indicator.
-*   **Output:** Triggers `onScanComplete` callback with results.
-
-**Source:** `frontend/lib/src/widgets/scanner_control_panel.dart`
-
-### 4.2.1 Collapsible UI [Partially Implemented]
-**Behavior:**
-*   **Expanded:** Full layout (title, range input, scan button).
-*   **Collapsed:** Compact row (Title + Scan button).
-*   **Auto-Collapse:** [NOT IMPLEMENTED] Should automatically collapse after the first scan completes.
-
-### 4.2.2 Real-Time Scan Progress [NOT IMPLEMENTED]
-**Behavior:**
-*   **Polling:** Poll `get_scan_progress()` every 500ms.
-*   **Display:** `"Scanning: X/Y IPs... (Z miners found)"`.
-
-### 4.3 `MinerDetailDialog`
-**Purpose:** Expanded view for individual miner inspection.
+### 4.3 `ActionBar`
+**Purpose:** Top toolbar for global monitoring and batch actions.
 
 **Behavior:**
-*   **Input:** Selected `Miner` object from `MinerListView`.
-*   **Displays:** 
-    *   **Performance:** RT vs Avg Hashrate, Uptime.
-    *   **Thermals:** Chip and PCB temperature grids (color-coded).
-    *   **Cooling:** Fan speeds (RPM).
-    *   **System Info:** Hardware model, Firmware version, Software version.
-    *   **Mining Pools:** List of active pools (1-3) with associated workers.
-*   **Actions:** Quick access to single-device commands (reboot, blink).
+*   **Global Controls:**
+    *   **Scan Network:** Triggers the discovery process.
+    *   **Monitor:** Toggles the background polling loop.
+*   **Batch Actions:**
+    *   **Reboot Selected:** Sends reboot command to selected miners.
+    *   **Locate (Blink):** Toggles the LED blinking state on selected miners for physical identification (provides visual feedback in UI).
 
-**Source:** `frontend/lib/src/widgets/miner_detail_dialog.dart`
+**Source:** `frontend/lib/src/widgets/action_bar.dart`
 
-### 4.4 `BatchActionBar`
-**Purpose:** Execute commands on multiple selected miners.
+### 4.4 `HeaderBar`
+**Purpose:** Displays global application status and navigation controls.
 
-**Behavior:**
-*   **Input:** List of selected miner IPs from `MinerListView`.
-*   **Actions:** Reboot, Blink LED (calls `execute_command()` bridge function).
-*   **Feedback:** Shows progress indicator and success/failure toast notifications.
+**Display:**
+*   **Stats:** Live counts for Online/Total miners and Total Network Hashrate.
+*   **Controls:** Sidebar toggle, Theme toggle (Light/Dark), and Settings access.
 
-**Source:** `frontend/lib/src/widgets/batch_action_bar.dart` *(to be implemented)*
-
-### 4.4.1 Staggered Batch Execution [NOT IMPLEMENTED]
-**Requirement:** To prevent network flooding and handle device limitations, batch actions should be staggered.
-
-**Proposed Backend Logic:**
-*   **BatchConfig:** `max_concurrent: 10`, `delay_between_batches_ms: 0`.
-*   **Concurrency:** Use `tokio::sync::Semaphore` to limit concurrent tasks.
-
-## 4.5 StatusBar [Implemented]
-**Widget:** `StatusBar` — `frontend/lib/src/widgets/status_bar.dart`
-
-**Behavior:**
-*   **Input:** `List<Miner>`, `int selectedCount`
-*   **Output:** Fixed bottom bar: `Total: X | Active: X | Warning: X | Offline: X | Selected: X`
-*   **Styling:** Compact height, monospaced counts, color-coded.
-
-## 4.6 SearchFilterBar [NOT IMPLEMENTED]
-**Widget:** `SearchFilterBar` — `frontend/lib/src/widgets/search_filter_bar.dart`
-
-**Behavior:**
-*   **Inputs:** `onSearchChanged(String)`, `onFilterChanged(Set<String>)`
-*   **Components:** Text search (IP/Model) + Filter Chips (Active/Warning).
-*   **Logic:** `MinerDashboard` filters the list before passing it to `MinerListView`.
+**Source:** `frontend/lib/src/widgets/header_bar.dart`
 
 ## 5. CGMiner API Protocol Detail
 
@@ -311,7 +259,9 @@ These functions are defined in the `backend/src/api` module:
 
 3.  **`execute_batch_command`**
     *   **Input:** `target_ips: Vec<String>`, `command: MinerCommand`
-    *   **Output:** `Vec<CommandResult>` (Batch execution results per IP)
+4.  **`detect_local_ranges`**
+    *   **Input:** `()`
+    *   **Output:** `Vec<String>` (Returns list of local `/24` subnets, e.g., `["192.168.1.1-192.168.1.254"]`)
 
 ## 7. Implementation Strategy
 

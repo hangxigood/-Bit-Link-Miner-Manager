@@ -25,6 +25,7 @@ class IpRangesSectionState extends State<IpRangesSection> {
   Set<String> _selectedRanges = {};
   bool _onlyShowSuccessful = false;
   bool _isScanning = false;
+  bool _isDetecting = false;
   
   final _startIpController = TextEditingController();
   final _endIpController = TextEditingController();
@@ -109,6 +110,43 @@ class IpRangesSectionState extends State<IpRangesSection> {
     }
   }
 
+  Future<void> _handleAutoDetect() async {
+    setState(() {
+      _isDetecting = true;
+    });
+
+    try {
+      final ranges = await detectLocalRanges();
+      if (ranges.isEmpty) {
+        widget.onShowToast('No local network ranges detected');
+        return;
+      }
+
+      int addedCount = 0;
+      for (final range in ranges) {
+        if (!_ranges.contains(range)) {
+          await IpRangeService.addRange(range);
+          addedCount++;
+        }
+      }
+
+      await _loadRanges();
+      widget.onShowToast(
+        addedCount > 0
+            ? 'Detected $addedCount new range${addedCount > 1 ? 's' : ''}'
+            : 'All detected ranges already exist',
+      );
+    } catch (e) {
+      widget.onShowToast('Auto-detect failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDetecting = false;
+        });
+      }
+    }
+  }
+
   void _toggleAll(bool? value) {
     setState(() {
       if (value == true) {
@@ -164,11 +202,15 @@ class IpRangesSectionState extends State<IpRangesSection> {
             ),
             SizedBox(width: 4),
             TextButton.icon(
-              onPressed: () {
-                widget.onShowToast('Auto-import not implemented yet');
-              },
-              icon: Icon(Icons.cloud_download, size: 14),
-              label: Text('Auto'),
+              onPressed: _isDetecting ? null : _handleAutoDetect,
+              icon: _isDetecting
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.cloud_download, size: 14),
+              label: Text(_isDetecting ? 'Detecting...' : 'Auto'),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: Size(0, 24),

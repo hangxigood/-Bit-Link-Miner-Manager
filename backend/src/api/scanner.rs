@@ -34,3 +34,43 @@ pub fn validate_ip_range(range: String) -> Result<String, String> {
         Err(e) => Err(format!("Invalid range: {}", e)),
     }
 }
+
+/// Detect local network interfaces and return their /24 subnet ranges.
+/// Filters out loopback (127.x.x.x) and link-local (169.254.x.x) addresses.
+pub fn detect_local_ranges() -> Vec<String> {
+    use network_interface::{NetworkInterface, NetworkInterfaceConfig};
+    use std::collections::HashSet;
+
+    let mut ranges = HashSet::new();
+
+    if let Ok(interfaces) = NetworkInterface::show() {
+        for iface in interfaces {
+            for addr in &iface.addr {
+                if let network_interface::Addr::V4(v4) = addr {
+                    let ip = v4.ip;
+                    let octets = ip.octets();
+
+                    // Skip loopback
+                    if octets[0] == 127 {
+                        continue;
+                    }
+                    // Skip link-local
+                    if octets[0] == 169 && octets[1] == 254 {
+                        continue;
+                    }
+
+                    let range = format!(
+                        "{}.{}.{}.1-{}.{}.{}.254",
+                        octets[0], octets[1], octets[2],
+                        octets[0], octets[1], octets[2]
+                    );
+                    ranges.insert(range);
+                }
+            }
+        }
+    }
+
+    let mut result: Vec<String> = ranges.into_iter().collect();
+    result.sort();
+    result
+}
