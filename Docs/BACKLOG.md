@@ -45,9 +45,25 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
 
 ---
 
-## 🟡 In Progress (Current Focus)
+## 🟡 In Progress (v0.5 Rebranding & Enhancements)
 
-### Testing & Reliability
+### Rebranding (GreatTool)
+- [ ] **Name Change**: Update app title, window title, and "About" dialog to **GreatTool**.
+- [ ] **Theme Update**: Apply `greatpool.ca` palette:
+    - [ ] Primary: Teal (`#0DCBA3`).
+    - [ ] Background: Deep Navy (`#201C3D`).
+    - [ ] Text: Greyish Blue (`#515A6E`).
+
+### Enhanced Monitoring
+- [ ] **Data Grid**:
+    - [ ] **Reorderable Columns**: Implement drag-and-drop for column headers.
+    - [ ] **Persistence**: Save column order to local storage (shared_preferences).
+    - [ ] **Locate Toggle**: Replace logic with boolean switch column (Blink ON/OFF).
+- [ ] **Temperature Data**:
+    - [ ] Split into `Inlet Temp` and `Outlet Temp` columns.
+    - [ ] Format: `40 | 42 | 41` (Show all boards).
+
+### Testing
 - [ ] **Frontend Widget Tests**: Create `MinerDataTable` test suite to verify rendering without backend.
 - [ ] **Integration Tests**: Verify full scan->monitor flow in CI environment.
 

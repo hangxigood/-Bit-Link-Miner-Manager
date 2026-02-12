@@ -1,7 +1,7 @@
-# Product Requirements Document (PRD): "Bit-Link" Miner Manager
+# Product Requirements Document (PRD): "GreatTool" Miner Manager
 
 ## 1. Product Overview
-**Bit-Link** is a high-performance desktop application for discovering, monitoring, and managing Bitcoin ASIC miners on a local network. It is designed for high-density industrial environments (100–1000+ devices).
+**GreatTool** (formerly Bit-Link) is a high-performance desktop application for discovering, monitoring, and managing Bitcoin ASIC miners on a local network. It is designed for high-density industrial environments (100–1000+ devices).
 
 **Core Philosophy:**
 1.  **Speed**: Scan thousands of IPs in seconds.
@@ -34,8 +34,15 @@
 **Goal:** Provide a live, sortable, filterable view of the entire fleet's health.
 
 *   **Data Grid View**: active miners are displayed in a high-density table.
-    *   **No Drill-Down**: All critical metrics (Hashrate, Temp, Fans) are visible in the row.
-    *   **Sorting**: Clicking headers sorts the list by that metric.
+    *   **Customizable Columns**: Users can drag-to-reorder columns. The order **MUST** be persisted between sessions.
+    *   **Temperature Format**: 
+        *   Split into two columns: **Inlet Temp** and **Outlet Temp**.
+        *   Each column displays individual board temps separated by pipes (e.g., `40 | 42 | 41`).
+    *   **Locate Toggle**: 
+        *   Replaces the old "Locate" button.
+        *   A boolean switch column directly in the grid.
+        *   **ON**: Sends `blink_led: true`.
+        *   **OFF**: Sends `blink_led: false`.
 
 *   **Miner Status Definitions**:
     The system assigns one of the following states to each device:
@@ -57,7 +64,6 @@
 
 *   **Commands**:
     *   **Reboot**: Restarts the mining software/hardware.
-    *   **Blink LED**: Flashes the physical locator LED for maintenance.
     *   **Pool Config** (Future): Sets Stratum URL and Worker User/Pass.
 
 *   **🚨 Safety: Staggered Execution**:
@@ -75,9 +81,13 @@
 ## 3. UI/UX Requirements
 
 ### 3.1 Visual Language
-*   **Theme**: Dark Mode only (Industrial standard).
+*   **Theme**: "GreatPool" Theme (derived from `greatpool.ca`).
+    *   **Primary Brand**: Teal (`#0DCBA3`) - Highlights, Active States, Toggles.
+    *   **Background (Dark)**: Deep Navy (`#201C3D`) - App Headers, Sidebar.
+    *   **Background (Light)**: White (`#FFFFFF`) - Data Grid background.
+    *   **Text**: Greyish Blue (`#515A6E`).
 *   **Color Coding**:
-    *   **Hashrate**: White (Normal), Red (Low).
+    *   **Hashrate**: Normal text color (Normal), Red (Low).
     *   **Temp**: Green (<70°C), Orange (70-85°C), Red (>85°C).
 *   **Density**:
     *   Row height should be minimized to fit maximum devices on screen.
