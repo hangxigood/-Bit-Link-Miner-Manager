@@ -60,9 +60,12 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
     - [ ] **Reorderable Columns**: Implement drag-and-drop for column headers.
     - [ ] **Persistence**: Save column order to local storage (shared_preferences).
     - [ ] **Locate Toggle**: Replace logic with boolean switch column (Blink ON/OFF).
+    - [ ] **Fan Speed Display**: Fix column width/formatting (currently truncates like `5280 |...`).
 - [ ] **Temperature Data**:
     - [ ] Split into `Inlet Temp` and `Outlet Temp` columns.
     - [ ] Format: `40 | 42 | 41` (Show all boards).
+- [ ] **UX Improvements**:
+    - [ ] **Auto Scan Button**: Rename "Auto" to "Detect" or "Fresh" to clarify intent.
 
 ### Testing
 - [ ] **Frontend Widget Tests**: Create `MinerDataTable` test suite to verify rendering without backend.
