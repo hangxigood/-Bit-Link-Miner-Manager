@@ -35,7 +35,7 @@ To build a high-performance, cross-platform desktop application that discovers, 
 ### Phase 3: Batch Control (Medium Priority) ✅
 *   **Reboot:** Send a reboot command to selected miners.
 *   **Blink LED:** Trigger the "Flash LED" command.
-*   **Safe Execution (Staggered Batching):**
+*   **Safe Execution (Staggered Batching):** ✅
     *   **Problem:** Rebooting or changing power modes on hundreds of miners simultaneously causes massive power surges/drops that can trip breakers.
     *   **Solution:** Users can configure a **"Max Concurrent Operations"** limit (e.g., reboot 10 miners at a time) or a delay interval between batches. The system queues commands and executes them sequentially to smooth out power consumption.
 
@@ -147,7 +147,7 @@ To build a high-performance, cross-platform desktop application that discovers, 
 | Sticky column headers | Medium |
 | Collapsible scanner panel | Medium |
 | Real-time scan progress (count updates) | Medium |
-| **Staggered Batch Execution Logic** | **High** |
+| **Staggered Batch Execution Logic** | ✅ Done |
 | **Wide Data Grid (All Columns)** | **High** |
 
 ### Future (v0.3+ — Advanced Features)

@@ -217,7 +217,9 @@ The frontend uses a dashboard layout with a collapsible sidebar and a central da
     *   **Scan Network:** Triggers the discovery process.
     *   **Monitor:** Toggles the background polling loop.
 *   **Batch Actions:**
-    *   **Reboot Selected:** Sends reboot command to selected miners.
+    *   **Reboot Selected:** Opens a configuration dialog offering:
+        *   **Staggered Reboot:** Executes in batches with a configurable delay. Shows a progress dialog with live status (success/fail counts) and a countdown timer.
+        *   **Reboot at Once:** Immediate execution for all selected miners.
     *   **Locate (Blink):** Toggles the LED blinking state on selected miners for physical identification (provides visual feedback in UI).
 
 **Source:** `frontend/lib/src/widgets/action_bar.dart`
@@ -230,6 +232,15 @@ The frontend uses a dashboard layout with a collapsible sidebar and a central da
 *   **Controls:** Sidebar toggle, Theme toggle (Light/Dark), and Settings access.
 
 **Source:** `frontend/lib/src/widgets/header_bar.dart`
+
+### 4.5 Services
+**Purpose:** Handle data persistence and business logic separation from UI widgets.
+
+*   **`CredentialsService`**: Manages secure storage of miner SSH credentials (username/password) using `shared_preferences`.
+*   **`IpRangeService`**: Persists user-defined IP scan ranges.
+*   **`BatchSettingsService`**: Saves last-used configurations for staggered batch execution (batch size, delay interval).
+
+**Source:** `frontend/lib/src/services/`
 
 ## 5. CGMiner API Protocol Detail
 
@@ -330,7 +341,7 @@ These functions are defined in the `backend/src/api` module:
 | 3 | Column sorting | **Implemented** |
 | 4 | Collapsible scanner panel | **Partially Implemented** |
 | 5 | Search & filter bar | **Pending** |
-| 6 | Staggered batch execution | **Pending** |
+| 6 | Staggered batch execution | **Implemented** |
 | 7 | Scan progress | **Pending** |
 | 8 | Sticky column headers | **Pending** |
 | 9 | Wide data grid polish | **Partially Implemented** |
