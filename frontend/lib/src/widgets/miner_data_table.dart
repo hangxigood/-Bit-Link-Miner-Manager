@@ -92,15 +92,15 @@ class MinerDataTable extends StatelessWidget {
   double _getColumnWidth(String id) {
     switch (id) {
       case 'ip': return 130;
-      case 'status': return 100;
-      case 'locate': return 80;
+      case 'status': return 110;
+      case 'locate': return 90;
       case 'model': return 160;
       case 'mac': return 140;
       case 'hashrate_rt': return 100;
       case 'hashrate_avg': return 100;
-      case 'temp': return 80;
-      case 'temp_in': return 100;
-      case 'temp_out': return 100;
+      case 'temp': return 90;
+      case 'temp_in': return 110;
+      case 'temp_out': return 110;
       case 'fan': return 180; // Widen for full display
       case 'uptime': return 100;
       case 'pool1': case 'pool2': case 'pool3': return 180;
@@ -191,9 +191,12 @@ class MinerDataTable extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: align == TextAlign.right ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
-                Text(
-                  label.toUpperCase(),
-                  style: Theme.of(context).textTheme.labelSmall,
+                Flexible(
+                  child: Text(
+                    label.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 SizedBox(width: 4),
                 Icon(
