@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD): "GreatTool" Miner Manager
 
 ## 1. Product Overview
-**GreatTool** (formerly Bit-Link) is a high-performance desktop application for discovering, monitoring, and managing Bitcoin ASIC miners on a local network. It is designed for high-density industrial environments (100–1000+ devices).
+**GreatTool** is a high-performance desktop application for discovering, monitoring, and managing Bitcoin ASIC miners on a local network. It is designed for high-density industrial environments (100–1000+ devices).
 
 **Core Philosophy:**
 1.  **Speed**: Scan thousands of IPs in seconds.
@@ -86,6 +86,9 @@
     *   **Background (Dark)**: Deep Navy (`#201C3D`) - App Headers, Sidebar.
     *   **Background (Light)**: White (`#FFFFFF`) - Data Grid background.
     *   **Text**: Greyish Blue (`#515A6E`).
+    *   **Toast / Notifications**:
+        *   Must use semantic colors (Success/Error/Info) with high contrast.
+        *   Should appear as floating cards (Snackbars) with rounded corners, consistent with the Material 3 design but using brand colors.
 *   **Color Coding**:
     *   **Hashrate**: Normal text color (Normal), Red (Low).
     *   **Temp**: Green (<70°C), Orange (70-85°C), Red (>85°C).

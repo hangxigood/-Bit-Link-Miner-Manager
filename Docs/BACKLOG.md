@@ -53,6 +53,7 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
     - [ ] Primary: Teal (`#0DCBA3`).
     - [ ] Background: Deep Navy (`#201C3D`).
     - [ ] Text: Greyish Blue (`#515A6E`).
+    - [ ] **Toast Styling**: Implement custom `SnackBar` theme with semantic colors (Success/Error) and rounded design.
 
 ### Enhanced Monitoring
 - [ ] **Data Grid**:
