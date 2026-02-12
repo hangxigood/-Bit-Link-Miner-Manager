@@ -44,8 +44,8 @@ class IpRangesSectionState extends State<IpRangesSection> {
   }
 
   // Public method to trigger scan from outside
-  Future<void> scanSelectedRanges() async {
-    await _scanSelectedRanges();
+  Future<List<Miner>> scanSelectedRanges() async {
+    return await _scanSelectedRanges();
   }
 
   Future<void> _loadRanges() async {
@@ -79,10 +79,10 @@ class IpRangesSectionState extends State<IpRangesSection> {
     await _loadRanges();
   }
 
-  Future<void> _scanSelectedRanges() async {
+  Future<List<Miner>> _scanSelectedRanges() async {
     if (_selectedRanges.isEmpty) {
       widget.onShowToast('No IP ranges selected');
-      return;
+      return [];
     }
 
     setState(() {
@@ -99,8 +99,10 @@ class IpRangesSectionState extends State<IpRangesSection> {
       }
       
       widget.onScanComplete(allMiners);
+      return allMiners;
     } catch (e) {
       widget.onShowToast('Scan failed: $e');
+      return [];
     } finally {
       if (mounted) {
         setState(() {

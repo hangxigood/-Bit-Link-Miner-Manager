@@ -15,7 +15,7 @@ class ActionBar extends StatefulWidget {
   final bool isMonitoring;
   final Function(bool) onMonitorToggle;
   final Function(String) onShowToast;
-  final Future<void> Function() onTriggerScan;
+  final Future<List<Miner>> Function() onTriggerScan;
 
   const ActionBar({
     super.key,
@@ -311,18 +311,27 @@ class _ActionBarState extends State<ActionBar> {
   Future<void> _handleMonitorToggle() async {
     try {
       if (widget.isMonitoring) {
-        await stopMonitoring();
+        // Stop monitoring - don't await to avoid UI freeze
         widget.onMonitorToggle(false);
+        stopMonitoring().catchError((e) {
+          // Silently handle errors
+        });
         widget.onShowToast('Monitoring stopped');
       } else {
-        final ips = widget.allMiners.map((m) => m.ip).toList();
-        if (ips.isEmpty) {
-          widget.onShowToast('No miners to monitor');
-          return;
+        var miners = widget.allMiners;
+        if (miners.isEmpty) {
+          // No miners yet — trigger a scan first, then start monitoring
+          widget.onShowToast('Scanning network first...');
+          miners = await widget.onTriggerScan();
+          
+          if (miners.isEmpty) {
+            widget.onShowToast('No miners found after scan');
+            return;
+          }
         }
-        await startMonitoring(ips: ips);
+        await startMonitoring(miners: miners);
         widget.onMonitorToggle(true);
-        widget.onShowToast('Monitoring started for ${ips.length} miners');
+        widget.onShowToast('Monitoring started for ${miners.length} miners');
       }
     } catch (e) {
       widget.onShowToast('Monitor toggle failed: $e');

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/widgets/header_bar.dart';
 import 'package:frontend/src/widgets/sidebar.dart';
 import 'package:frontend/src/widgets/sidebar/ip_ranges_section.dart';
 import 'package:frontend/src/widgets/main_content.dart';
+import 'package:frontend/src/rust/api/monitor.dart';
 
 class DashboardShell extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -26,6 +28,7 @@ class _DashboardShellState extends State<DashboardShell> {
   bool _isSidebarCollapsed = false;
   bool _isScanning = false;
   bool _isMonitoring = false;
+  Timer? _monitorTimer;
   
   // Filter/Search state
   String _searchQuery = '';
@@ -174,6 +177,53 @@ class _DashboardShellState extends State<DashboardShell> {
     setState(() {
       _isMonitoring = enabled;
     });
+    if (enabled) {
+      _startMonitorPolling();
+    } else {
+      _stopMonitorPolling();
+    }
+  }
+
+  void _startMonitorPolling() {
+    _monitorTimer?.cancel();
+    // Immediately fetch once
+    _fetchMonitoredMiners();
+    // Then poll every 5 seconds
+    _monitorTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _fetchMonitoredMiners();
+    });
+  }
+
+  void _stopMonitorPolling() {
+    _monitorTimer?.cancel();
+    _monitorTimer = null;
+    // Call stopMonitoring asynchronously without awaiting to avoid UI freeze
+    stopMonitoring().catchError((e) {
+      // Silently handle errors
+    });
+  }
+
+  Future<void> _fetchMonitoredMiners() async {
+    try {
+      final miners = await getCurrentMiners();
+      if (mounted && _isMonitoring) {
+        // Only update if we have data, or if we're replacing with a non-empty list
+        // This keeps existing data visible until new data arrives
+        if (miners.isNotEmpty || _miners.isEmpty) {
+          setState(() {
+            _miners = miners;
+          });
+        }
+      }
+    } catch (e) {
+      // Silently handle errors during polling
+    }
+  }
+
+  @override
+  void dispose() {
+    _monitorTimer?.cancel();
+    super.dispose();
   }
 
   void _showToast(String message) {
@@ -187,8 +237,8 @@ class _DashboardShellState extends State<DashboardShell> {
     );
   }
 
-  Future<void> _triggerScan() async {
-    _ipRangesSectionKey.currentState?.scanSelectedRanges();
+  Future<List<Miner>> _triggerScan() async {
+    return await _ipRangesSectionKey.currentState?.scanSelectedRanges() ?? [];
   }
 
   @override

@@ -25,7 +25,7 @@ class MainContent extends StatelessWidget {
   final bool isMonitoring;
   final Function(bool) onMonitorToggle;
   final Function(String) onShowToast;
-  final Future<void> Function() onTriggerScan;
+  final Future<List<Miner>> Function() onTriggerScan;
 
   const MainContent({
     super.key,
