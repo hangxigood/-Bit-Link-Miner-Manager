@@ -3,27 +3,27 @@ import 'package:flutter/material.dart';
 /// Custom color scheme using HSL values from the spec
 class AppTheme {
   // Light theme colors (HSL converted to RGB)
-  static const _lightBackground = Color(0xFFFAFAFA); // hsl(0,0%,98%)
-  static const _lightCard = Color(0xFFFFFFFF); // hsl(0,0%,100%)
-  static const _lightText = Color(0xFF1A1D23); // hsl(220,16%,12%)
-  static const _lightMutedText = Color(0xFF64748B); // hsl(215,12%,45%)
-  static const _lightBorder = Color(0xFFE2E4E9); // hsl(220,14%,88%)
-  static const _lightSecondary = Color(0xFFEDEFF2); // hsl(220,14%,93%)
-  static const _lightPrimary = Color(0xFFD97706); // hsl(36,100%,46%)
+  static const _lightBackground = Color(0xFFF5F7FA); // GreatPool Light Grey
+  static const _lightCard = Color(0xFFFFFFFF);
+  static const _lightText = Color(0xFF243147); // GreatPool Dark Navy Text
+  static const _lightMutedText = Color(0xFF515A6E); // GreatPool Greyish Blue
+  static const _lightBorder = Color(0xFFE2E4E9);
+  static const _lightSecondary = Color(0xFFEDEFF2);
+  static const _lightPrimary = Color(0xFF0DCBA3); // GreatPool Teal
 
   // Dark theme colors (HSL converted to RGB)
-  static const _darkBackground = Color(0xFF0F1419); // hsl(220,16%,6%)
-  static const _darkCard = Color(0xFF13181F); // hsl(220,16%,8%)
-  static const _darkText = Color(0xFFEFF1F5); // hsl(210,20%,95%)
-  static const _darkMutedText = Color(0xFF8B92A1); // hsl(215,12%,55%)
-  static const _darkBorder = Color(0xFF252A31); // hsl(220,14%,16%)
-  static const _darkSecondary = Color(0xFF1F2329); // hsl(220,14%,14%)
-  static const _darkPrimary = Color(0xFFFF9800); // hsl(36,100%,50%)
+  static const _darkBackground = Color(0xFF201C3D); // GreatPool Deep Navy
+  static const _darkCard = Color(0xFF2A264D); // Slightly lighter navy for cards
+  static const _darkText = Color(0xFFFFFFFF);
+  static const _darkMutedText = Color(0xFF8B92A1);
+  static const _darkBorder = Color(0xFF353158); // Navy border
+  static const _darkSecondary = Color(0xFF2A264D);
+  static const _darkPrimary = Color(0xFF0DCBA3); // GreatPool Teal
 
-  // Status colors (same for both themes)
-  static const success = Color(0xFF22C55E); // hsl(142,71%,45%)
-  static const warning = Color(0xFFFF9800); // hsl(36,100%,50%)
-  static const error = Color(0xFFEF4444); // hsl(0,72%,51%)
+  // Status colors
+  static const success = Color(0xFF0DCBA3); // Use Brand Teal for Success
+  static const warning = Color(0xFFFF9800);
+  static const error = Color(0xFFEF4444);
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -170,6 +170,14 @@ class AppTheme {
           letterSpacing: 0.5,
           color: _darkText,
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: _darkCard,
+        contentTextStyle: TextStyle(color: _darkText),
+        actionTextColor: _darkPrimary,
+        insetPadding: EdgeInsets.all(16),
       ),
       dividerColor: _darkBorder,
     );
