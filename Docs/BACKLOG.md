@@ -47,11 +47,12 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
 - [x] **Data Grid**:
     - [x] **Reorderable Columns**: Settings Dialog with drag-and-drop.
     - [x] **Persistence**: Saved column visibility/order (shared_preferences).
+    - [x] **Resizable Columns**: Drag column headers to resize. [New]
     - [x] **Locate Toggle**: Boolean switch column (Blink ON/OFF).
     - [x] **Fan Speed Display**: Fixed width/formatting with fit-to-content.
 - [x] **Temperature Data**:
     - [x] Split into `Inlet Temp` and `Outlet Temp` columns.
-    - [x] Formatted as `40 | 42 | 41`.
+    - [x] Formatted as `min | max`.
 - [x] **UX Improvements**:
     - [x] **Auto Scan Button**: Renamed to "Detect".
 

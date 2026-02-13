@@ -47,9 +47,13 @@ Represents the **identity** of a device.
 Represents the **telemetry** of a device at a specific point in time.
 *   **hashrate_rt**: `f64` (Real-time 5s average)
 *   **hashrate_avg**: `f64` (Session average)
-*   **temps**: `Vec<u32>` (Chip/PCB temperatures)
-*   **fans**: `Vec<u32>` (RPMs)
-*   **pools**: `Vec<PoolConfig>` (Active stratum URLs)
+*   **temp_outlet_min/max**: `Vec<Option<f64>>` (Outlet/Chip temperatures)
+*   **temp_inlet_min/max**: `Vec<Option<f64>>` (Inlet/PCB temperatures)
+*   **fan_speeds**: `Vec<Option<u32>>` (RPMs)
+*   **pools**: `Vec<PoolConfig>` (Active stratum URLs) - *Note: implementation uses explicit fields pool1/worker1 etc.*
+*   **firmware**: `Option<String>`
+*   **software**: `Option<String>`
+*   **hardware**: `Option<String>`
 
 ### 3.3 `MinerStatus` (Enum)
 Logic for classifying device health:

@@ -35,6 +35,7 @@
 
 *   **Data Grid View**: active miners are displayed in a high-density table.
     *   **Customizable Columns**: Users can drag-to-reorder columns. The order **MUST** be persisted between sessions.
+    *   **Resizable Columns**: Users can drag to resize column widths. Widths **MUST** be persisted.
     *   **Temperature Format**: 
         *   Split into two columns: **Inlet Temp** and **Outlet Temp**.
         *   Each column displays individual board temps separated by pipes (e.g., `40 | 42 | 41`).
