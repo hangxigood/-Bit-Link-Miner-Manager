@@ -176,9 +176,11 @@ pub async fn get_summary(
     // 2. Get Detailed Stats (Temps, Fans)
     if let Ok(stats_json) = send_command(ip, port, "stats", timeout_ms).await {
         if let Ok(clean_json) = extract_json(&stats_json) {
-            let (chip, pcb, fans) = parse_stats_data(&clean_json);
-            stats.temperature_chip = chip;
-            stats.temperature_pcb = pcb;
+            let (outlet_min, outlet_max, inlet_min, inlet_max, fans) = parse_stats_data(&clean_json);
+            stats.temp_outlet_min = outlet_min;
+            stats.temp_outlet_max = outlet_max;
+            stats.temp_inlet_min = inlet_min;
+            stats.temp_inlet_max = inlet_max;
             stats.fan_speeds = fans;
         }
     }
@@ -351,11 +353,13 @@ fn parse_summary_to_stats(summary: SummaryData) -> Result<MinerStats> {
     };
     
     Ok(MinerStats {
-        hashrate_rt, 
+        hashrate_rt,
         hashrate_avg,
-        temperature_chip: Vec::new(), // Will be populated from detailed stats
-        temperature_pcb: Vec::new(),
-        fan_speeds: Vec::new(),
+        temp_outlet_min: vec![None, None, None], // Will be populated from detailed stats
+        temp_outlet_max: vec![None, None, None],
+        temp_inlet_min: vec![None, None, None],
+        temp_inlet_max: vec![None, None, None],
+        fan_speeds: vec![None, None, None, None],
         uptime: summary.elapsed.unwrap_or(0),
         pool1: None,
         worker1: None,
@@ -388,84 +392,112 @@ fn parse_hashrate_string(s: &str) -> Result<f64> {
     }
 }
 
-fn parse_stats_data(json: &str) -> (Vec<f64>, Vec<f64>, Vec<u32>) {
-    let mut chip_temps = Vec::new();
-    let mut pcb_temps = Vec::new();
-    let mut fans = Vec::new();
+fn parse_stats_data(json: &str) -> (Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<u32>>) {
+    let mut temp_outlet_min = vec![None, None, None]; // Chip temps min (outlet)
+    let mut temp_outlet_max = vec![None, None, None]; // Chip temps max (outlet)
+    let mut temp_inlet_min = vec![None, None, None];  // PCB temps min (inlet)
+    let mut temp_inlet_max = vec![None, None, None];  // PCB temps max (inlet)
+    let mut fans = vec![None, None, None, None];
 
     if let Ok(resp) = serde_json::from_str::<CgMinerStatsResponse>(json) {
         if let Some(stats_vec) = resp.stats {
             for stat in stats_vec {
                 if let Some(obj) = stat.as_object() {
-                    // Fans
                     for (k, v) in obj {
-                        if k.starts_with("fan") && !k.contains("num") {
+                        // Parse specific fan indices: fan1, fan2, fan3, fan4
+                        if k == "fan1" {
                             if let Some(speed) = v.as_u64() {
                                 if speed > 0 {
-                                    fans.push(speed as u32);
+                                    fans[0] = Some(speed as u32);
                                 }
                             }
-                        }
-                        
-                        // Temps (chip)
-                        if k.starts_with("temp_chip") {
-                            if let Some(s) = v.as_str() {
-                                // Parse "45-45-62-62" -> max 62
-                                if let Some(max_t) = parse_temp_string(s) {
-                                    if max_t > 0.0 {
-                                        chip_temps.push(max_t);
-                                    }
-                                }
-                            } else if let Some(n) = v.as_f64() {
-                                if n > 0.0 {
-                                    chip_temps.push(n);
+                        } else if k == "fan2" {
+                            if let Some(speed) = v.as_u64() {
+                                if speed > 0 {
+                                    fans[1] = Some(speed as u32);
                                 }
                             }
-                        }
-                        // Also try generic temp{N} if temp_chip not found
-                         else if k.starts_with("temp") && !k.contains("pcb") && !k.contains("num") && !k.contains("_") {
-                            if let Some(n) = v.as_f64() {
-                                if n > 0.0 {
-                                    chip_temps.push(n);
+                        } else if k == "fan3" {
+                            if let Some(speed) = v.as_u64() {
+                                if speed > 0 {
+                                    fans[2] = Some(speed as u32);
+                                }
+                            }
+                        } else if k == "fan4" {
+                            if let Some(speed) = v.as_u64() {
+                                if speed > 0 {
+                                    fans[3] = Some(speed as u32);
                                 }
                             }
                         }
 
-                        // Temps (pcb)
-                        if k.starts_with("temp_pcb") {
-                            if let Some(s) = v.as_str() {
-                                if let Some(max_t) = parse_temp_string(s) {
-                                    if max_t > 0.0 {
-                                        pcb_temps.push(max_t);
-                                    }
-                                }
-                            } else if let Some(n) = v.as_f64() {
-                                if n > 0.0 {
-                                    pcb_temps.push(n);
-                                }
-                            }
+                        // Parse specific chip temp indices: temp_chip1, temp_chip2, temp_chip3
+                        else if k == "temp_chip1" {
+                            let (min, max) = parse_temp_min_max(v);
+                            temp_outlet_min[0] = min;
+                            temp_outlet_max[0] = max;
+                        } else if k == "temp_chip2" {
+                            let (min, max) = parse_temp_min_max(v);
+                            temp_outlet_min[1] = min;
+                            temp_outlet_max[1] = max;
+                        } else if k == "temp_chip3" {
+                            let (min, max) = parse_temp_min_max(v);
+                            temp_outlet_min[2] = min;
+                            temp_outlet_max[2] = max;
+                        }
+
+                        // Parse specific PCB temp indices: temp_pcb1, temp_pcb2, temp_pcb3
+                        else if k == "temp_pcb1" {
+                            let (min, max) = parse_temp_min_max(v);
+                            temp_inlet_min[0] = min;
+                            temp_inlet_max[0] = max;
+                        } else if k == "temp_pcb2" {
+                            let (min, max) = parse_temp_min_max(v);
+                            temp_inlet_min[1] = min;
+                            temp_inlet_max[1] = max;
+                        } else if k == "temp_pcb3" {
+                            let (min, max) = parse_temp_min_max(v);
+                            temp_inlet_min[2] = min;
+                            temp_inlet_max[2] = max;
                         }
                     }
                 }
             }
         }
     }
-    
-    // De-duplicate and sort
-    fans.sort();
-    fans.dedup(); // Sometimes multiple stats report same fans?
-    
-    // Sort logic isn't strictly necessary but clean
-    
-    (chip_temps, pcb_temps, fans)
+
+    (temp_outlet_min, temp_outlet_max, temp_inlet_min, temp_inlet_max, fans)
 }
 
-fn parse_temp_string(s: &str) -> Option<f64> {
-    // Format: "min-min-max-max" or just "temp"
-    // We want the max temperature to be safe
-    s.split('-')
-     .filter_map(|part| part.parse::<f64>().ok())
-     .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)) // Use max for safety monitoring
+/// Helper function to parse temperature values from JSON - returns min and max
+fn parse_temp_min_max(v: &serde_json::Value) -> (Option<f64>, Option<f64>) {
+    if let Some(s) = v.as_str() {
+        // Parse "45-62" or "40-40-60-60" -> (min, max)
+        return parse_temp_string(s);
+    } else if let Some(n) = v.as_f64() {
+        if n > 0.0 {
+            return (Some(n), Some(n));
+        }
+    }
+    (None, None)
+}
+
+fn parse_temp_string(s: &str) -> (Option<f64>, Option<f64>) {
+    // Format: "min-max" or "min-min-max-max" or just "temp"
+    // Return (min, max)
+    let temps: Vec<f64> = s.split('-')
+        .filter_map(|part| part.parse::<f64>().ok())
+        .filter(|&t| t > 0.0)
+        .collect();
+
+    if temps.is_empty() {
+        return (None, None);
+    }
+
+    let min = temps.iter().copied().min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let max = temps.iter().copied().max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    (min, max)
 }
 
 fn parse_pools_data(json: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>) {
@@ -558,7 +590,8 @@ mod tests {
     
     #[test]
     fn test_parse_temp_string() {
-        assert_eq!(parse_temp_string("40-40-60-60"), Some(60.0));
-        assert_eq!(parse_temp_string("50"), Some(50.0));
+        assert_eq!(parse_temp_string("40-40-60-60"), (Some(40.0), Some(60.0)));
+        assert_eq!(parse_temp_string("40-60"), (Some(40.0), Some(60.0)));
+        assert_eq!(parse_temp_string("50"), (Some(50.0), Some(50.0)));
     }
 }

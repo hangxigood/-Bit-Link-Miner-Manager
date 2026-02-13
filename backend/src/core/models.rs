@@ -15,10 +15,14 @@ pub struct Miner {
 pub struct MinerStats {
     pub hashrate_rt: f64,      // Real-time hashrate (TH/s)
     pub hashrate_avg: f64,     // Average hashrate (TH/s)
-    pub temperature_chip: Vec<f64>,  // Chip temperatures (°C)
-    pub temperature_pcb: Vec<f64>,   // PCB temperatures (°C)
-    pub fan_speeds: Vec<u32>,        // Fan speeds (RPM)
-    pub uptime: u64,                 // Uptime in seconds
+    // Outlet (chip) temperatures for 3 hash boards (°C)
+    pub temp_outlet_min: Vec<Option<f64>>,
+    pub temp_outlet_max: Vec<Option<f64>>,
+    // Inlet (PCB) temperatures for 3 hash boards (°C)
+    pub temp_inlet_min: Vec<Option<f64>>,
+    pub temp_inlet_max: Vec<Option<f64>>,
+    pub fan_speeds: Vec<Option<u32>>,   // Fan speeds for 4 fans (RPM)
+    pub uptime: u64,                    // Uptime in seconds
     
     // Detailed Info
     pub pool1: Option<String>,
@@ -49,9 +53,11 @@ impl Default for MinerStats {
         Self {
             hashrate_rt: 0.0,
             hashrate_avg: 0.0,
-            temperature_chip: Vec::new(),
-            temperature_pcb: Vec::new(),
-            fan_speeds: Vec::new(),
+            temp_outlet_min: vec![None, None, None],
+            temp_outlet_max: vec![None, None, None],
+            temp_inlet_min: vec![None, None, None],
+            temp_inlet_max: vec![None, None, None],
+            fan_speeds: vec![None, None, None, None],
             uptime: 0,
             pool1: None,
             worker1: None,

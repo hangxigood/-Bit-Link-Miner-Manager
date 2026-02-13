@@ -261,10 +261,11 @@ fn clean_json_response(response: &str) -> Option<String> {
 
 /// Determine miner status based on stats
 fn determine_status_from_stats(stats: &crate::core::MinerStats) -> MinerStatus {
-    // Check temperature
-    let max_temp = stats.temperature_chip.iter()
-        .chain(stats.temperature_pcb.iter())
-        .fold(0.0_f64, |max, &temp| max.max(temp));
+    // Check temperature - find max from all max values
+    let max_temp = stats.temp_outlet_max.iter()
+        .chain(stats.temp_inlet_max.iter())
+        .filter_map(|&t| t)
+        .fold(0.0_f64, |max, temp| max.max(temp));
     
     if max_temp >= 85.0 {
         return MinerStatus::Warning;

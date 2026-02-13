@@ -163,10 +163,11 @@ async fn poll_single_miner(
 
 /// Determine miner status based on stats and thresholds
 fn determine_status(stats: &crate::core::MinerStats, config: &MonitorConfig) -> MinerStatus {
-    // Check temperature
-    let max_temp = stats.temperature_chip.iter()
-        .chain(stats.temperature_pcb.iter())
-        .fold(0.0_f64, |max, &temp| max.max(temp));
+    // Check temperature - find max from all max values
+    let max_temp = stats.temp_outlet_max.iter()
+        .chain(stats.temp_inlet_max.iter())
+        .filter_map(|&t| t)
+        .fold(0.0_f64, |max, temp| max.max(temp));
     
     if max_temp >= config.warning_temp_threshold {
         return MinerStatus::Warning;
