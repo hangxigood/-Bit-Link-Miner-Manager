@@ -11,6 +11,7 @@ import 'package:frontend/src/rust/api/monitor.dart';
 import 'package:frontend/src/rust/api/commands.dart';
 import 'package:frontend/src/widgets/column_settings_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:frontend/src/constants/column_constants.dart';
 
 class DashboardShell extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -63,16 +64,24 @@ class _DashboardShellState extends State<DashboardShell> {
   Future<void> _loadColumnSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString('miner_table_columns_v1');
-      
+
+      // Clean up old preference keys
+      await prefs.remove('miner_table_columns_v1');
+      await prefs.remove('miner_table_columns_v2');
+      await prefs.remove('miner_table_columns_v3');
+      await prefs.remove('miner_table_columns_v4');
+
+      final String? jsonStr = prefs.getString('miner_table_columns_v5');
+
       if (jsonStr != null) {
         final List<dynamic> jsonList = jsonDecode(jsonStr);
         final loaded = jsonList.map((e) => DataColumnConfig(
           id: e['id'],
           label: e['label'],
           visible: e['visible'],
+          width: (e['width'] as num?)?.toDouble() ?? 100.0,
         )).toList();
-        
+
         setState(() {
           _columns = loaded;
           _isLoadingColumns = false;
@@ -84,7 +93,7 @@ class _DashboardShellState extends State<DashboardShell> {
       _resetColumns();
     }
   }
-  
+
   Future<void> _saveColumnSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -92,32 +101,46 @@ class _DashboardShellState extends State<DashboardShell> {
         'id': c.id,
         'label': c.label,
         'visible': c.visible,
+        'width': c.width,
       }).toList();
-      await prefs.setString('miner_table_columns_v1', jsonEncode(jsonList));
+      await prefs.setString('miner_table_columns_v5', jsonEncode(jsonList));
     } catch (e) {
       // Ignore save errors
     }
   }
   
+
+
   void _resetColumns() {
     setState(() {
       _columns = [
-        DataColumnConfig(id: 'ip', label: 'IP Address', visible: true),
-        DataColumnConfig(id: 'status', label: 'Status', visible: true),
-        DataColumnConfig(id: 'locate', label: 'Locate', visible: true),
-        DataColumnConfig(id: 'model', label: 'Model', visible: true),
-        DataColumnConfig(id: 'hashrate_rt', label: 'RT Hash', visible: true),
-        DataColumnConfig(id: 'hashrate_avg', label: 'Avg Hash', visible: false),
-        DataColumnConfig(id: 'temp_in', label: 'Inlet Temp', visible: true),
-        DataColumnConfig(id: 'temp_out', label: 'Outlet Temp', visible: true),
-        DataColumnConfig(id: 'fan', label: 'Fans', visible: true),
-        DataColumnConfig(id: 'uptime', label: 'Uptime', visible: true),
-        DataColumnConfig(id: 'pool1', label: 'Pool 1', visible: true),
-        DataColumnConfig(id: 'worker1', label: 'Worker 1', visible: true),
-        DataColumnConfig(id: 'mac', label: 'MAC Addr', visible: false),
-        DataColumnConfig(id: 'firmware', label: 'Firmware', visible: false),
-        DataColumnConfig(id: 'software', label: 'Software', visible: false),
-        DataColumnConfig(id: 'hardware', label: 'Hardware', visible: false),
+        DataColumnConfig(id: ColumnConstants.idIp, label: 'IP Address', visible: true, width: ColumnConstants.widthIp),
+        DataColumnConfig(id: ColumnConstants.idStatus, label: 'Status', visible: true, width: ColumnConstants.widthStatus),
+        DataColumnConfig(id: ColumnConstants.idLocate, label: 'Locate', visible: true, width: ColumnConstants.widthLocate),
+        DataColumnConfig(id: ColumnConstants.idModel, label: 'Model', visible: true, width: ColumnConstants.widthModel),
+        DataColumnConfig(id: ColumnConstants.idHashrateRt, label: 'Hashrate', visible: true, width: ColumnConstants.widthHashrate),
+        DataColumnConfig(id: ColumnConstants.idHashrateAvg, label: 'Avg Hash', visible: false, width: ColumnConstants.widthHashrate),
+        DataColumnConfig(id: ColumnConstants.idTempIn0, label: 'InT-0', visible: true, width: ColumnConstants.widthTemp),
+        DataColumnConfig(id: ColumnConstants.idTempIn1, label: 'InT-1', visible: true, width: ColumnConstants.widthTemp),
+        DataColumnConfig(id: ColumnConstants.idTempIn2, label: 'InT-2', visible: true, width: ColumnConstants.widthTemp),
+        DataColumnConfig(id: ColumnConstants.idTempOut0, label: 'OutT-0', visible: true, width: ColumnConstants.widthTemp),
+        DataColumnConfig(id: ColumnConstants.idTempOut1, label: 'OutT-1', visible: true, width: ColumnConstants.widthTemp),
+        DataColumnConfig(id: ColumnConstants.idTempOut2, label: 'OutT-2', visible: true, width: ColumnConstants.widthTemp),
+        DataColumnConfig(id: ColumnConstants.idFan0, label: 'Fan-0', visible: true, width: ColumnConstants.widthFan),
+        DataColumnConfig(id: ColumnConstants.idFan1, label: 'Fan-1', visible: true, width: ColumnConstants.widthFan),
+        DataColumnConfig(id: ColumnConstants.idFan2, label: 'Fan-2', visible: true, width: ColumnConstants.widthFan),
+        DataColumnConfig(id: ColumnConstants.idFan3, label: 'Fan-3', visible: true, width: ColumnConstants.widthFan),
+        DataColumnConfig(id: ColumnConstants.idUptime, label: 'Uptime', visible: true, width: ColumnConstants.widthUptime),
+        DataColumnConfig(id: ColumnConstants.idPool1, label: 'Pool 1', visible: true, width: ColumnConstants.widthPool),
+        DataColumnConfig(id: ColumnConstants.idWorker1, label: 'Worker 1', visible: true, width: ColumnConstants.widthWorker),
+        DataColumnConfig(id: ColumnConstants.idPool2, label: 'Pool 2', visible: false, width: ColumnConstants.widthPool),
+        DataColumnConfig(id: ColumnConstants.idWorker2, label: 'Worker 2', visible: false, width: ColumnConstants.widthWorker),
+        DataColumnConfig(id: ColumnConstants.idPool3, label: 'Pool 3', visible: false, width: ColumnConstants.widthPool),
+        DataColumnConfig(id: ColumnConstants.idWorker3, label: 'Worker 3', visible: false, width: ColumnConstants.widthWorker),
+        DataColumnConfig(id: ColumnConstants.idMac, label: 'MAC Addr', visible: false, width: ColumnConstants.widthMac),
+        DataColumnConfig(id: ColumnConstants.idFirmware, label: 'Firmware', visible: false, width: ColumnConstants.widthMeta),
+        DataColumnConfig(id: ColumnConstants.idSoftware, label: 'Software', visible: false, width: ColumnConstants.widthMeta),
+        DataColumnConfig(id: ColumnConstants.idHardware, label: 'Hardware', visible: false, width: ColumnConstants.widthMeta),
       ];
       _isLoadingColumns = false;
     });
@@ -355,6 +378,16 @@ class _DashboardShellState extends State<DashboardShell> {
     }
   }
 
+  void _handleColumnWidthChanged(String columnId, double newWidth) {
+    setState(() {
+      final index = _columns.indexWhere((c) => c.id == columnId);
+      if (index >= 0) {
+        _columns[index] = _columns[index].copyWith(width: newWidth);
+      }
+    });
+    _saveColumnSettings();
+  }
+
   @override
   void dispose() {
     _monitorTimer?.cancel();
@@ -436,7 +469,9 @@ class _DashboardShellState extends State<DashboardShell> {
                     onTriggerScan: _triggerScan,
                     visibleColumns: _columns,
                     blinkingIps: _blinkingIps,
-                    onBlinkToggle: _handleBlinkToggle, // Pass the row handler
+                    onBlinkToggle: _handleBlinkToggle,
+                    onShowColumnSettings: _openColumnSettings,
+                    onColumnWidthChanged: _handleColumnWidthChanged,
                   ),
                 ),
               ],

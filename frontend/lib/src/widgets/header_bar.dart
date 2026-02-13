@@ -206,18 +206,6 @@ class _HeaderBarState extends State<HeaderBar> with SingleTickerProviderStateMix
             ),
           ),
           
-          // Columns
-          IconButton(
-            icon: Icon(Icons.view_column, size: 18),
-            onPressed: widget.onShowColumnSettings,
-            tooltip: 'Column Settings',
-            padding: EdgeInsets.all(8),
-            constraints: BoxConstraints(),
-            style: IconButton.styleFrom(
-              foregroundColor: context.mutedText,
-            ),
-          ),
-          
           SizedBox(width: 8),
           
           // Settings

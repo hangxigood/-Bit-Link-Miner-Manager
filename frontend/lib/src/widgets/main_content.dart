@@ -30,6 +30,8 @@ class MainContent extends StatelessWidget {
   final List<DataColumnConfig> visibleColumns;
   final Set<String> blinkingIps;
   final Function(String ip, bool isBlinking) onBlinkToggle;
+  final VoidCallback onShowColumnSettings;
+  final Function(String columnId, double newWidth) onColumnWidthChanged;
 
   const MainContent({
     super.key,
@@ -56,11 +58,14 @@ class MainContent extends StatelessWidget {
     required this.visibleColumns,
     required this.blinkingIps,
     required this.onBlinkToggle,
+    required this.onShowColumnSettings,
+    required this.onColumnWidthChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ActionBar(
           selectedIps: selectedIps,
@@ -93,6 +98,8 @@ class MainContent extends StatelessWidget {
             visibleColumns: visibleColumns,
             blinkingIps: blinkingIps,
             onBlinkToggle: onBlinkToggle,
+            onShowColumnSettings: onShowColumnSettings,
+            onColumnWidthChanged: onColumnWidthChanged,
           ),
         ),
       ],

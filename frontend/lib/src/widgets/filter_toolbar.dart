@@ -44,61 +44,64 @@ class FilterToolbar extends StatelessWidget {
           bottom: BorderSide(color: context.border, width: 1),
         ),
       ),
-      child: Row(
-        children: [
-          // Search input
-          SizedBox(
-            width: 300,
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by IP, model, worker, pool...',
-                hintStyle: TextStyle(fontSize: 11),
-                prefixIcon: Icon(Icons.search, size: 18),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // Search input
+            SizedBox(
+              width: 300,
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search by IP, model, worker, pool...',
+                  hintStyle: TextStyle(fontSize: 11),
+                  prefixIcon: Icon(Icons.search, size: 18),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                style: TextStyle(fontSize: 12),
+                onChanged: onSearchChanged,
               ),
-              style: TextStyle(fontSize: 12),
-              onChanged: onSearchChanged,
             ),
-          ),
-          
-          SizedBox(width: 16),
-          
-          // Status filter buttons
-          _buildFilterButton(
-            context,
-            'All',
-            MinerStatusFilter.all,
-            _getCountForFilter(MinerStatusFilter.all),
-          ),
-          SizedBox(width: 6),
-          _buildFilterButton(
-            context,
-            'Online',
-            MinerStatusFilter.online,
-            _getCountForFilter(MinerStatusFilter.online),
-          ),
-          SizedBox(width: 6),
-          _buildFilterButton(
-            context,
-            'Warning',
-            MinerStatusFilter.warning,
-            _getCountForFilter(MinerStatusFilter.warning),
-          ),
-          SizedBox(width: 6),
-          _buildFilterButton(
-            context,
-            'Error',
-            MinerStatusFilter.error,
-            _getCountForFilter(MinerStatusFilter.error),
-          ),
-          SizedBox(width: 6),
-          _buildFilterButton(
-            context,
-            'Offline',
-            MinerStatusFilter.offline,
-            _getCountForFilter(MinerStatusFilter.offline),
-          ),
-        ],
+            
+            SizedBox(width: 16),
+            
+            // Status filter buttons
+            _buildFilterButton(
+              context,
+              'All',
+              MinerStatusFilter.all,
+              _getCountForFilter(MinerStatusFilter.all),
+            ),
+            SizedBox(width: 6),
+            _buildFilterButton(
+              context,
+              'Online',
+              MinerStatusFilter.online,
+              _getCountForFilter(MinerStatusFilter.online),
+            ),
+            SizedBox(width: 6),
+            _buildFilterButton(
+              context,
+              'Warning',
+              MinerStatusFilter.warning,
+              _getCountForFilter(MinerStatusFilter.warning),
+            ),
+            SizedBox(width: 6),
+            _buildFilterButton(
+              context,
+              'Error',
+              MinerStatusFilter.error,
+              _getCountForFilter(MinerStatusFilter.error),
+            ),
+            SizedBox(width: 6),
+            _buildFilterButton(
+              context,
+              'Offline',
+              MinerStatusFilter.offline,
+              _getCountForFilter(MinerStatusFilter.offline),
+            ),
+          ],
+        ),
       ),
     );
   }

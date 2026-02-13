@@ -4,6 +4,7 @@ import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/theme/app_theme.dart';
 import 'package:frontend/src/services/credentials_service.dart';
 import 'package:frontend/src/widgets/column_settings_dialog.dart';
+import 'package:frontend/src/constants/column_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MinerDataTable extends StatelessWidget {
@@ -20,6 +21,8 @@ class MinerDataTable extends StatelessWidget {
   final List<DataColumnConfig> visibleColumns;
   final Set<String> blinkingIps;
   final Function(String ip, bool isBlinking) onBlinkToggle;
+  final VoidCallback onShowColumnSettings;
+  final Function(String columnId, double newWidth) onColumnWidthChanged;
 
   const MinerDataTable({
     super.key,
@@ -36,6 +39,8 @@ class MinerDataTable extends StatelessWidget {
     required this.visibleColumns,
     required this.blinkingIps,
     required this.onBlinkToggle,
+    required this.onShowColumnSettings,
+    required this.onColumnWidthChanged,
   });
 
   void _toggleSelectAll() {
@@ -56,21 +61,22 @@ class MinerDataTable extends StatelessWidget {
     onSelectionChanged(newSelection);
   }
 
-  double _getMaxTemp(MinerStats stats) {
-    double maxChip = stats.temperatureChip.isEmpty ? 0 : stats.temperatureChip.reduce((a, b) => a > b ? a : b);
-    double maxPcb = stats.temperaturePcb.isEmpty ? 0 : stats.temperaturePcb.reduce((a, b) => a > b ? a : b);
-    return maxChip > maxPcb ? maxChip : maxPcb;
-  }
-  
-  String _formatTemps(List<double> temps) {
-    if (temps.isEmpty) return '-';
-    return temps.map((t) => t.toStringAsFixed(0)).join(' | ');
+  String _formatSingleTemp(double? temp) {
+    if (temp == null) return '-';
+    return temp.toStringAsFixed(1);
   }
 
-  Color _getTempColor(BuildContext context, double temp) {
-    if (temp < 75) return context.success;
-    if (temp < 85) return context.warning;
-    return context.error;
+  String _formatTempRange(double? min, double? max) {
+    if (min == null && max == null) return '-';
+    if (min == null) return max!.toInt().toString();
+    if (max == null) return min.toInt().toString();
+    if (min == max) return min.toInt().toString();
+    return '${min.toInt()} | ${max.toInt()}';
+  }
+
+  String _formatSingleFan(int? fan) {
+    if (fan == null) return '-';
+    return fan.toString();
   }
 
   String _formatUptime(BigInt uptime) {
@@ -90,21 +96,10 @@ class MinerDataTable extends StatelessWidget {
   }
   
   double _getColumnWidth(String id) {
-    switch (id) {
-      case 'ip': return 130;
-      case 'status': return 110;
-      case 'locate': return 90;
-      case 'model': return 160;
-      case 'mac': return 140;
-      case 'hashrate_rt': return 100;
-      case 'hashrate_avg': return 100;
-      case 'temp': return 90;
-      case 'temp_in': return 110;
-      case 'temp_out': return 110;
-      case 'fan': return 180; // Widen for full display
-      case 'uptime': return 100;
-      case 'pool1': case 'pool2': case 'pool3': return 180;
-      default: return 140;
+    try {
+      return visibleColumns.firstWhere((c) => c.id == id).width;
+    } catch (_) {
+      return 100.0;
     }
   }
 
@@ -120,22 +115,39 @@ class MinerDataTable extends StatelessWidget {
         Expanded(
           child: Container(
             color: Theme.of(context).colorScheme.surface,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context),
-                    ...miners.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final miner = entry.value;
-                      return _buildRow(context, miner, index);
-                    }),
-                  ],
-                ),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate total content width (checkbox + all visible columns)
+                final contentWidth = 50.0 +
+                    visibleColumns
+                        .where((c) => c.visible)
+                        .fold<double>(0, (sum, col) => sum + _getColumnWidth(col.id));
+
+                // Use the larger of viewport width or content width
+                final tableWidth = contentWidth > constraints.maxWidth
+                    ? contentWidth
+                    : constraints.maxWidth;
+
+                return SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: tableWidth,
+                      child: Column(
+                        children: [
+                          _buildHeader(context),
+                          ...miners.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final miner = entry.value;
+                            return _buildRow(context, miner, index);
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -169,7 +181,14 @@ class MinerDataTable extends StatelessWidget {
           // Dynamic columns
           ...visibleColumns.where((c) => c.visible).map((col) {
             TextAlign align = TextAlign.left;
-            if (['hashrate_rt', 'hashrate_avg', 'temp', 'fan', 'uptime'].contains(col.id)) align = TextAlign.right;
+            // Right-align numeric columns
+            if (['hashrate_rt', 'hashrate_avg',
+                 'temp_in_0', 'temp_in_1', 'temp_in_2',
+                 'temp_out_0', 'temp_out_1', 'temp_out_2',
+                 'fan_0', 'fan_1', 'fan_2', 'fan_3',
+                 'uptime'].contains(col.id)) {
+              align = TextAlign.right;
+            }
             return _buildHeaderCell(col.label, col.id, _getColumnWidth(col.id), align: align);
           }),
         ],
@@ -182,34 +201,67 @@ class MinerDataTable extends StatelessWidget {
       builder: (context) {
         final isActive = sortColumn == column;
         
-        return InkWell(
-          onTap: () => onSortChanged(column),
-          child: Container(
-            width: width,
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: align == TextAlign.right ? MainAxisAlignment.end : MainAxisAlignment.start,
-              children: [
-                Flexible(
-                  child: Text(
-                    label.toUpperCase(),
-                    style: Theme.of(context).textTheme.labelSmall,
-                    overflow: TextOverflow.ellipsis,
+        return Container(
+          width: width,
+          decoration: BoxDecoration(
+            border: Border(
+              right: BorderSide(color: context.border.withOpacity(0.3), width: 1),
+            ),
+          ),
+          child: Stack(
+            children: [
+              InkWell(
+                onTap: () => onSortChanged(column),
+                child: Container(
+                  width: width,
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: align == TextAlign.right ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isActive ? Theme.of(context).colorScheme.primary : null,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      if (isActive)
+                        Icon(
+                          sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                    ],
                   ),
                 ),
-                SizedBox(width: 4),
-                Icon(
-                  isActive
-                      ? (sortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                      : Icons.unfold_more,
-                  size: 14,
-                  color: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : context.mutedText.withOpacity(0.5),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: 10,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragUpdate: (details) {
+                      final newWidth = width + details.delta.dx;
+                      if (newWidth >= 50) {
+                        onColumnWidthChanged(column, newWidth);
+                      }
+                    },
+                    child: Container(
+                      color: Colors.transparent,
+                    ),
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -272,12 +324,11 @@ class MinerDataTable extends StatelessWidget {
     final width = _getColumnWidth(colId);
 
     switch (colId) {
-      case 'ip':
+      case ColumnConstants.idIp:
         return _buildCell(miner.ip, width, mono: true);
-      case 'status':
+      case ColumnConstants.idStatus:
         return _buildStatusCell(context, miner.status, width);
-      case 'locate':
-        // Boolean switch
+      case ColumnConstants.idLocate:
         final isBlinking = blinkingIps.contains(miner.ip);
         return Container(
           width: width,
@@ -292,48 +343,76 @@ class MinerDataTable extends StatelessWidget {
             ),
           ),
         );
-      case 'mac':
+      case ColumnConstants.idMac:
         return _buildCell(miner.stats.macAddress ?? '-', width, mono: true);
-      case 'model':
+      case ColumnConstants.idModel:
         return _buildCell(miner.model ?? '-', width);
-      case 'hashrate_rt':
+      case ColumnConstants.idHashrateRt:
         return _buildCell('${miner.stats.hashrateRt.toStringAsFixed(2)} TH/s', width, mono: true, align: TextAlign.right);
-      case 'hashrate_avg':
+      case ColumnConstants.idHashrateAvg:
         return _buildCell('${miner.stats.hashrateAvg.toStringAsFixed(2)} TH/s', width, mono: true, align: TextAlign.right);
-      case 'temp':
-        return _buildTempCell(context, _getMaxTemp(miner.stats), width);
-      case 'temp_in':
-        // Inlet = PCB temps usually
-        return _buildCell(_formatTemps(miner.stats.temperaturePcb), width, mono: true, align: TextAlign.right);
-      case 'temp_out':
-        // Outlet = Chip temps usually
-        return _buildCell(_formatTemps(miner.stats.temperatureChip), width, mono: true, align: TextAlign.right);
-      case 'fan':
-        // Wider column format, fitted
-        final fanStr = miner.stats.fanSpeeds.isEmpty ? '-' : miner.stats.fanSpeeds.join(' | ');
-        return _buildCell(fanStr, width, mono: true, align: TextAlign.right, tooltip: fanStr);
-      case 'uptime':
+      case ColumnConstants.idUptime:
         return _buildCell(_formatUptime(miner.stats.uptime), width, mono: true, align: TextAlign.right);
-      case 'pool1':
-        return _buildPoolCell(context, miner.stats.pool1, width);
-      case 'worker1':
-        return _buildCell(miner.stats.worker1 ?? '-', width);
-      case 'pool2':
-        return _buildPoolCell(context, miner.stats.pool2, width);
-      case 'worker2':
-        return _buildCell(miner.stats.worker2 ?? '-', width);
-      case 'pool3':
-        return _buildPoolCell(context, miner.stats.pool3, width);
-      case 'worker3':
-        return _buildCell(miner.stats.worker3 ?? '-', width);
-      case 'firmware':
+      
+      // Meta info
+      case ColumnConstants.idFirmware:
         return _buildCell(miner.stats.firmware ?? '-', width);
-      case 'software':
+      case ColumnConstants.idSoftware:
         return _buildCell(miner.stats.software ?? '-', width);
-      case 'hardware':
+      case ColumnConstants.idHardware:
         return _buildCell(miner.stats.hardware ?? '-', width);
+        
       default:
+        // Try to handle indexed fields
+        if (colId.startsWith('temp_in_')) {
+          final index = int.tryParse(colId.split('_').last) ?? 0;
+          return _buildTempCell(miner.stats.tempInletMin, miner.stats.tempInletMax, index, width);
+        }
+        if (colId.startsWith('temp_out_')) {
+          final index = int.tryParse(colId.split('_').last) ?? 0;
+          return _buildTempCell(miner.stats.tempOutletMin, miner.stats.tempOutletMax, index, width);
+        }
+        if (colId.startsWith('fan_')) {
+          final index = int.tryParse(colId.split('_').last) ?? 0;
+          return _buildFanCell(miner.stats.fanSpeeds, index, width);
+        }
+        if (colId.startsWith('pool') || colId.startsWith('worker')) {
+          return _buildPoolWorkerCell(context, miner.stats, colId, width);
+        }
+        
         return _buildCell('-', width);
+    }
+  }
+
+  Widget _buildTempCell(List<double?> mins, List<double?> maxs, int index, double width) {
+    if (index >= mins.length || index >= maxs.length) return _buildCell('-', width, align: TextAlign.right);
+    return _buildCell(
+      _formatTempRange(mins.elementAtOrNull(index), maxs.elementAtOrNull(index)),
+      width,
+      mono: true,
+      align: TextAlign.right,
+    );
+  }
+
+  Widget _buildFanCell(List<int?> fans, int index, double width) {
+    if (index >= fans.length) return _buildCell('-', width, align: TextAlign.right);
+    return _buildCell(
+      _formatSingleFan(fans.elementAtOrNull(index)),
+      width,
+      mono: true,
+      align: TextAlign.right,
+    );
+  }
+
+  Widget _buildPoolWorkerCell(BuildContext context, MinerStats stats, String colId, double width) {
+    switch (colId) {
+      case ColumnConstants.idPool1: return _buildPoolCell(context, stats.pool1, width);
+      case ColumnConstants.idWorker1: return _buildCell(stats.worker1 ?? '-', width);
+      case ColumnConstants.idPool2: return _buildPoolCell(context, stats.pool2, width);
+      case ColumnConstants.idWorker2: return _buildCell(stats.worker2 ?? '-', width);
+      case ColumnConstants.idPool3: return _buildPoolCell(context, stats.pool3, width);
+      case ColumnConstants.idWorker3: return _buildCell(stats.worker3 ?? '-', width);
+      default: return _buildCell('-', width);
     }
   }
 
@@ -424,49 +503,6 @@ class MinerDataTable extends StatelessWidget {
     );
   }
 
-  Widget _buildTempCell(BuildContext context, double temp, double width) {
-    final color = _getTempColor(context, temp);
-    final percentage = (temp / 100).clamp(0.0, 1.0);
-
-    return Container(
-      width: width,
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${temp.toStringAsFixed(0)}°C',
-            style: TextStyle(
-              fontSize: 11,
-              fontFamily: 'monospace',
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 2),
-          Container(
-            height: 3,
-            decoration: BoxDecoration(
-              color: context.secondarySurface,
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: FractionallySizedBox(
-              widthFactor: percentage,
-              alignment: Alignment.centerLeft,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPoolCell(BuildContext context, String? poolUrl, double width) {
     final stripped = _stripProtocol(poolUrl);
 
@@ -523,6 +559,23 @@ class MinerDataTable extends StatelessWidget {
             icon: Icon(Icons.chevron_right, size: 20),
             onPressed: currentPage < totalPages - 1 ? () => onPageChanged(currentPage + 1) : null,
             tooltip: 'Next page',
+          ),
+          SizedBox(width: 8),
+          Container(
+            height: 24,
+            width: 1,
+            color: context.border,
+          ),
+          SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.view_column, size: 18),
+            onPressed: onShowColumnSettings,
+            tooltip: 'Column Settings',
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+            style: IconButton.styleFrom(
+              foregroundColor: context.mutedText,
+            ),
           ),
         ],
       ),

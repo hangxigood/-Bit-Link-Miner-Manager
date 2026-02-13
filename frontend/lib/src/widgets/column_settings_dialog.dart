@@ -5,18 +5,21 @@ class DataColumnConfig {
   final String id;
   final String label;
   final bool visible;
+  final double width;
 
   const DataColumnConfig({
     required this.id,
     required this.label,
     required this.visible,
+    required this.width,
   });
 
-  DataColumnConfig copyWith({String? id, String? label, bool? visible}) {
+  DataColumnConfig copyWith({String? id, String? label, bool? visible, double? width}) {
     return DataColumnConfig(
       id: id ?? this.id,
       label: label ?? this.label,
       visible: visible ?? this.visible,
+      width: width ?? this.width,
     );
   }
 }
@@ -63,6 +66,14 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
     });
   }
 
+  void _setAll(bool visible) {
+    setState(() {
+      for (var i = 0; i < _columns.length; i++) {
+        _columns[i] = _columns[i].copyWith(visible: visible);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -101,23 +112,45 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
             Divider(color: context.border),
             Expanded(
               child: ReorderableListView.builder(
+                buildDefaultDragHandles: false,
                 itemCount: _columns.length,
                 onReorder: _onReorder,
                 itemBuilder: (context, index) {
                   final col = _columns[index];
-                  return ListTile(
+                  return Material(
                     key: ValueKey(col.id),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: ReorderableDragStartListener(
-                      index: index,
-                      child: Icon(Icons.drag_indicator, color: context.mutedText),
-                    ),
-                    title: Text(col.label, style: Theme.of(context).textTheme.bodyMedium),
-                    trailing: Checkbox(
-                      value: col.visible,
-                      onChanged: (val) => _onToggle(index, val),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _onToggle(index, !col.visible),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                        child: Row(
+                          children: [
+                            // Drag handle - ensure specific touch area
+                            ReorderableDragStartListener(
+                              index: index,
+                              child: Container(
+                                padding: EdgeInsets.all(8),
+                                child: Icon(Icons.drag_indicator, color: context.mutedText),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            // Label
+                            Expanded(
+                              child: Text(
+                                col.label,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                            // Checkbox
+                            Checkbox(
+                              value: col.visible,
+                              onChanged: (val) => _onToggle(index, val),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -125,8 +158,16 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
             ),
             SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                TextButton(
+                  onPressed: () => _setAll(true),
+                  child: Text('Show All', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton(
+                  onPressed: () => _setAll(false),
+                  child: Text('Hide All', style: TextStyle(fontSize: 12)),
+                ),
+                Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text('Cancel'),
