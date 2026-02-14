@@ -152,7 +152,8 @@ pub async fn get_summary(
     
     // Real miners often send trailing null bytes or extra characters
     // Find the actual JSON bounds and parse only that portion
-    let json_str = extract_json(&response_str)?;
+    let json_str = crate::utils::extract_clean_json(&response_str)
+        .unwrap_or_else(|| response_str.trim_matches(|c: char| c.is_whitespace() || c == '\0').to_string());
     
     // Parse the response
     let response: CgMinerResponse = serde_json::from_str(&json_str)?;
@@ -175,7 +176,7 @@ pub async fn get_summary(
 
     // 2. Get Detailed Stats (Temps, Fans)
     if let Ok(stats_json) = send_command(ip, port, "stats", timeout_ms).await {
-        if let Ok(clean_json) = extract_json(&stats_json) {
+        if let Some(clean_json) = crate::utils::extract_clean_json(&stats_json) {
             let (outlet_min, outlet_max, inlet_min, inlet_max, fans) = parse_stats_data(&clean_json);
             stats.temp_outlet_min = outlet_min;
             stats.temp_outlet_max = outlet_max;
@@ -187,7 +188,7 @@ pub async fn get_summary(
 
     // 3. Get Pools (Active Pool/Worker)
     if let Ok(pools_json) = send_command(ip, port, "pools", timeout_ms).await {
-        if let Ok(clean_json) = extract_json(&pools_json) {
+        if let Some(clean_json) = crate::utils::extract_clean_json(&pools_json) {
             let (p1, w1, p2, w2, p3, w3) = parse_pools_data(&clean_json);
             stats.pool1 = p1;
             stats.worker1 = w1;
@@ -200,7 +201,7 @@ pub async fn get_summary(
 
     // 4. Get Version (Hardware/Firmware/Model)
     if let Ok(version_json) = send_command(ip, port, "version", timeout_ms).await {
-        if let Ok(clean_json) = extract_json(&version_json) {
+        if let Some(clean_json) = crate::utils::extract_clean_json(&version_json) {
             let (hw, fw, sw, model) = parse_version_data(&clean_json);
             stats.hardware = hw;
             stats.firmware = fw;
@@ -305,26 +306,6 @@ fn parse_mac_from_arp_output(output: &str) -> Option<String> {
     None
 }
 
-/// Extract clean JSON from a response that may have trailing characters
-/// Miners often append null bytes, newlines, or other garbage after the JSON
-fn extract_json(response: &str) -> Result<String> {
-    // Remove leading/trailing whitespace and null bytes
-    let trimmed = response.trim_matches(|c: char| c.is_whitespace() || c == '\0');
-    
-    // Find the last closing brace - that's where the JSON should end
-    if let Some(last_brace) = trimmed.rfind('}') {
-        let json_str = &trimmed[..=last_brace];
-        
-        // Basic validation: should start with '{'
-        if json_str.starts_with('{') {
-            return Ok(json_str.to_string());
-        }
-    }
-    
-    // If we can't find valid JSON boundaries, return the trimmed string
-    // and let serde_json give us a more specific error
-    Ok(trimmed.to_string())
-}
 
 /// Parse summary data into MinerStats, handling different miner models
 fn parse_summary_to_stats(summary: SummaryData) -> Result<MinerStats> {
@@ -355,11 +336,11 @@ fn parse_summary_to_stats(summary: SummaryData) -> Result<MinerStats> {
     Ok(MinerStats {
         hashrate_rt,
         hashrate_avg,
-        temp_outlet_min: vec![None, None, None], // Will be populated from detailed stats
-        temp_outlet_max: vec![None, None, None],
-        temp_inlet_min: vec![None, None, None],
-        temp_inlet_max: vec![None, None, None],
-        fan_speeds: vec![None, None, None, None],
+        temp_outlet_min: Vec::new(), // Will be populated from detailed stats
+        temp_outlet_max: Vec::new(),
+        temp_inlet_min: Vec::new(),
+        temp_inlet_max: Vec::new(),
+        fan_speeds: Vec::new(),
         uptime: summary.elapsed.unwrap_or(0),
         pool1: None,
         worker1: None,

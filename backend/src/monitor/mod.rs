@@ -206,8 +206,8 @@ mod tests {
     fn test_status_determination_active() {
         let stats = MinerStats {
             hashrate_avg: 100.0,
-            temperature_chip: vec![70.0, 72.0, 71.0],
-            temperature_pcb: vec![65.0, 66.0],
+            temp_outlet_max: vec![Some(70.0), Some(72.0), Some(71.0)],
+            temp_inlet_max: vec![Some(65.0), Some(66.0)],
             ..Default::default()
         };
         
@@ -221,8 +221,8 @@ mod tests {
     fn test_status_determination_warning_temp() {
         let stats = MinerStats {
             hashrate_avg: 100.0,
-            temperature_chip: vec![87.0, 88.0, 86.0],
-            temperature_pcb: vec![65.0, 66.0],
+            temp_outlet_max: vec![Some(87.0), Some(88.0), Some(86.0)],
+            temp_inlet_max: vec![Some(65.0), Some(66.0)],
             ..Default::default()
         };
         
@@ -236,7 +236,7 @@ mod tests {
     fn test_status_determination_warning_no_hashrate() {
         let stats = MinerStats {
             hashrate_avg: 0.0,
-            temperature_chip: vec![70.0, 72.0],
+            temp_outlet_max: vec![Some(70.0), Some(72.0)],
             ..Default::default()
         };
         

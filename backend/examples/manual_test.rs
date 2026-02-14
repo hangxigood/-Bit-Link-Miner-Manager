@@ -36,8 +36,8 @@ async fn main() {
             println!("  Hashrate (rt):  {:.2} TH/s", stats.hashrate_rt);
             println!("  Uptime:         {} seconds ({:.1} hours)", 
                      stats.uptime, stats.uptime as f64 / 3600.0);
-            println!("  Chip temps:     {:?}", stats.temperature_chip);
-            println!("  PCB temps:      {:?}", stats.temperature_pcb);
+            println!("  Chip temps (max): {:?}", stats.temp_outlet_max);
+            println!("  PCB temps (max):  {:?}", stats.temp_inlet_max);
             println!("  Fan speeds:     {:?}", stats.fan_speeds);
             println!("  Pool 1:         {:?}", stats.pool1);
             println!("  Worker 1:       {:?}", stats.worker1);

@@ -1,4 +1,4 @@
-use rust_lib_frontend::{start_monitor, MonitorConfig, MonitorEvent, MinerStatus};
+use rust_lib_frontend::{start_monitor, MonitorConfig, MonitorEvent, MinerStatus, Miner, MinerStats};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -36,6 +36,16 @@ async fn start_mock_miner_with_control(port: u16, temp: f64, hashrate: f64) {
     tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
+fn create_test_miner(ip: &str) -> Miner {
+    Miner {
+        ip: ip.to_string(),
+        model: None,
+        status: MinerStatus::Scanning,
+        stats: MinerStats::default(),
+        last_updated: 0,
+    }
+}
+
 #[tokio::test]
 async fn test_monitor_basic_polling() {
     // Start a mock miner
@@ -47,7 +57,7 @@ async fn test_monitor_basic_polling() {
         ..Default::default()
     };
     
-    let mut rx = start_monitor(vec!["127.0.0.1".to_string()], config).await;
+    let mut rx = start_monitor(vec![create_test_miner("127.0.0.1")], config).await;
     
     // Should receive initial snapshot
     if let Some(MonitorEvent::FullSnapshot(miners)) = rx.recv().await {
@@ -86,7 +96,7 @@ async fn test_monitor_status_active() {
         ..Default::default()
     };
     
-    let mut rx = start_monitor(vec!["127.0.0.1".to_string()], config).await;
+    let mut rx = start_monitor(vec![create_test_miner("127.0.0.1")], config).await;
     
     // Skip initial snapshot
     let _ = rx.recv().await;
@@ -120,7 +130,7 @@ async fn test_monitor_multiple_miners() {
     
     // Note: In a real implementation, you'd need to support different ports per IP
     // For now, we'll just test with one
-    let mut rx = start_monitor(vec!["127.0.0.1".to_string()], config).await;
+    let mut rx = start_monitor(vec![create_test_miner("127.0.0.1")], config).await;
     
     // Should receive initial snapshot
     if let Some(MonitorEvent::FullSnapshot(miners)) = rx.recv().await {
@@ -139,7 +149,7 @@ async fn test_monitor_dead_detection() {
         ..Default::default()
     };
     
-    let mut rx = start_monitor(vec!["127.0.0.1".to_string()], config).await;
+    let mut rx = start_monitor(vec![create_test_miner("127.0.0.1")], config).await;
     
     // Skip initial snapshot
     let _ = rx.recv().await;

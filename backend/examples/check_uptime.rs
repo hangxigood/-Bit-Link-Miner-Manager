@@ -20,7 +20,7 @@ async fn main() {
             println!("--------------------------------");
             println!("Uptime:      {} seconds ({} minutes)", stats.uptime, stats.uptime / 60);
             println!("Hashrate:    {:.2} TH/s (RT)", stats.hashrate_rt);
-            println!("Temps (PCB): {:?}", stats.temperature_pcb);
+            println!("Temps (Inlet Max): {:?}", stats.temp_inlet_max);
             println!("Fans:        {:?}", stats.fan_speeds);
             println!("--------------------------------");
 

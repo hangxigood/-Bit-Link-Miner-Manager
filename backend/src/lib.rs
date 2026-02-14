@@ -4,6 +4,7 @@ pub mod client;
 pub mod scanner;
 pub mod monitor;
 pub mod api;
+pub mod utils;
 
 pub use core::{Miner, MinerStats, MinerStatus, MinerError, Result};
 pub use client::{send_command, get_summary, DEFAULT_PORT, DEFAULT_TIMEOUT_MS};

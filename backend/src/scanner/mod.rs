@@ -228,7 +228,7 @@ async fn scan_single_ip(ip: IpAddr, config: &ScanConfig) -> Option<Miner> {
 /// Extract miner model from version response
 fn extract_model_from_version(response: &str) -> Option<String> {
     // Clean the response first (miners send trailing characters)
-    let cleaned = clean_json_response(response)?;
+    let cleaned = crate::utils::extract_clean_json(response)?;
     
     // Try to parse JSON and extract Type field
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cleaned) {
@@ -245,19 +245,6 @@ fn extract_model_from_version(response: &str) -> Option<String> {
     None
 }
 
-/// Clean JSON response by removing trailing garbage
-fn clean_json_response(response: &str) -> Option<String> {
-    let trimmed = response.trim_matches(|c: char| c.is_whitespace() || c == '\0');
-    
-    if let Some(last_brace) = trimmed.rfind('}') {
-        let json_str = &trimmed[..=last_brace];
-        if json_str.starts_with('{') {
-            return Some(json_str.to_string());
-        }
-    }
-    
-    None
-}
 
 /// Determine miner status based on stats
 fn determine_status_from_stats(stats: &crate::core::MinerStats) -> MinerStatus {
