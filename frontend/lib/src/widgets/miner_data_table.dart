@@ -4,6 +4,7 @@ import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/theme/app_theme.dart';
 import 'package:frontend/src/services/credentials_service.dart';
 import 'package:frontend/src/widgets/column_settings_dialog.dart';
+import 'package:frontend/src/models/data_column_config.dart';
 import 'package:frontend/src/constants/column_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
-import 'package:frontend/src/widgets/dashboard_shell.dart';
+import 'package:frontend/src/models/miner_status_filter.dart';
 import 'package:frontend/src/theme/app_theme.dart';
 
 class FilterToolbar extends StatelessWidget {

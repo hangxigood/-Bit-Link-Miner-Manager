@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
-import 'package:frontend/src/widgets/dashboard_shell.dart';
+import 'package:frontend/src/models/miner_status_filter.dart';
+import 'package:frontend/src/models/data_column_config.dart';
+import 'package:frontend/src/controllers/action_controller.dart';
 import 'package:frontend/src/widgets/action_bar.dart';
 import 'package:frontend/src/widgets/filter_toolbar.dart';
-import 'package:frontend/src/widgets/column_settings_dialog.dart';
 import 'package:frontend/src/widgets/miner_data_table.dart';
 
 class MainContent extends StatelessWidget {
@@ -24,12 +25,9 @@ class MainContent extends StatelessWidget {
   final Function(int) onPageChanged;
   final bool isScanning;
   final bool isMonitoring;
-  final Function(bool) onMonitorToggle;
-  final Function(String) onShowToast;
-  final Future<List<Miner>> Function() onTriggerScan;
+  final ActionController actionController;
   final List<DataColumnConfig> visibleColumns;
   final Set<String> blinkingIps;
-  final Function(String ip, bool isBlinking) onBlinkToggle;
   final VoidCallback onShowColumnSettings;
   final Function(String columnId, double newWidth) onColumnWidthChanged;
 
@@ -52,12 +50,9 @@ class MainContent extends StatelessWidget {
     required this.onPageChanged,
     required this.isScanning,
     required this.isMonitoring,
-    required this.onMonitorToggle,
-    required this.onShowToast,
-    required this.onTriggerScan,
+    required this.actionController,
     required this.visibleColumns,
     required this.blinkingIps,
-    required this.onBlinkToggle,
     required this.onShowColumnSettings,
     required this.onColumnWidthChanged,
   });
@@ -72,9 +67,8 @@ class MainContent extends StatelessWidget {
           allMiners: allMiners,
           isScanning: isScanning,
           isMonitoring: isMonitoring,
-          onMonitorToggle: onMonitorToggle,
-          onShowToast: onShowToast,
-          onTriggerScan: onTriggerScan,
+          actionController: actionController,
+          blinkingIps: blinkingIps,
         ),
         FilterToolbar(
           searchQuery: searchQuery,
@@ -97,7 +91,7 @@ class MainContent extends StatelessWidget {
             onPageChanged: onPageChanged,
             visibleColumns: visibleColumns,
             blinkingIps: blinkingIps,
-            onBlinkToggle: onBlinkToggle,
+            onBlinkToggle: (ip, _) => actionController.toggleLocate([ip]),
             onShowColumnSettings: onShowColumnSettings,
             onColumnWidthChanged: onColumnWidthChanged,
           ),
