@@ -1,5 +1,7 @@
 use crate::api::models::{MinerCommand, CommandResult};
+
 use crate::core::MinerCredentials;
+use crate::client::{get_summary, whatsminer_web::WhatsminerWebClient};
 
 
 /// Execute a command on multiple miners
@@ -11,17 +13,20 @@ pub async fn execute_batch_command(
 ) -> Vec<CommandResult> {
     let mut results = Vec::new();
     
-    // Use provided credentials or default to root/root
-    let creds = credentials.unwrap_or_default();
+    let settings = AppSettings::load();
+    let antminer_creds = settings.antminer_credentials;
+    let whatsminer_creds = settings.whatsminer_credentials;
     
     // Execute commands concurrently
     let tasks: Vec<_> = target_ips
         .into_iter()
         .map(|ip| {
             let cmd = command.clone();
-            let creds_clone = creds.clone();
+            let a_creds = antminer_creds.clone();
+            let w_creds = whatsminer_creds.clone();
+            
             tokio::spawn(async move {
-                execute_single_command(ip, cmd, creds_clone).await
+                execute_single_command(ip, cmd, a_creds, w_creds).await
             })
         })
         .collect();
@@ -36,53 +41,97 @@ pub async fn execute_batch_command(
     results
 }
 
+use crate::api::settings::get_app_settings;
+use crate::core::config::AppSettings;
+
 /// Execute a command on a single miner
-async fn execute_single_command(ip: String, command: MinerCommand, credentials: MinerCredentials) -> CommandResult {
-    match command {
-        MinerCommand::Reboot => {
-            // Reboot uses the HTTP web interface with Digest Auth
-            // because the CGMiner API rejects privileged commands
-            match reboot_via_http(&ip, &credentials.username, &credentials.password).await {
-                Ok(_) => CommandResult {
-                    ip,
-                    success: true,
-                    error: None,
-                },
-                Err(e) => CommandResult {
-                    ip,
-                    success: false,
-                    error: Some(e),
-                },
+async fn execute_single_command(ip: String, command: MinerCommand, antminer_creds: MinerCredentials, whatsminer_creds: MinerCredentials) -> CommandResult {
+    println!("Executing command {:?} for {}...", command, ip);
+    
+    // Detect miner type
+    let is_whatsminer = if let Ok(stats) = get_summary(&ip, 4028, 500).await {
+         let model = stats.model.as_ref().map(|m| m.to_lowercase()).unwrap_or_default();
+         let firmware = stats.firmware.as_ref().map(|f| f.to_lowercase()).unwrap_or_default();
+         println!("Miner Detection - IP: {}, Model: {}, Firmware: {}", ip, model, firmware);
+         model.contains("whatsminer") || firmware.contains("whatsminer")
+    } else {
+        println!("Miner Detection - Failed to get summary for {}. Defaulting to Antminer.", ip);
+        false
+    };
+
+    if is_whatsminer {
+        println!("Detected Whatsminer for {}", ip);
+        match command {
+            MinerCommand::Reboot => {
+                match WhatsminerWebClient::reboot(&ip, &whatsminer_creds.username, &whatsminer_creds.password).await {
+                     Ok(_) => {
+                         println!("Whatsminer reboot SUCCESS for {}", ip);
+                         CommandResult { ip, success: true, error: None }
+                     },
+                     Err(e) => {
+                         println!("Whatsminer reboot FAILED for {}: {}", ip, e);
+                         CommandResult { ip, success: false, error: Some(e.to_string()) }
+                     },
+                }
+            }
+            MinerCommand::BlinkLed => {
+                 match WhatsminerWebClient::blink_led(&ip, &whatsminer_creds.username, &whatsminer_creds.password, true).await {
+                     Ok(_) => CommandResult { ip, success: true, error: None },
+                     Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
+                }
+            }
+            MinerCommand::StopBlink => {
+                 match WhatsminerWebClient::blink_led(&ip, &whatsminer_creds.username, &whatsminer_creds.password, false).await {
+                     Ok(_) => CommandResult { ip, success: true, error: None },
+                     Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
+                }
             }
         }
-        MinerCommand::BlinkLed => {
-            // Modern Antminers use HTTP API for blink control
-            match blink_led_via_http(&ip, &credentials.username, &credentials.password, true).await {
-                Ok(_) => CommandResult {
-                    ip,
-                    success: true,
-                    error: None,
-                },
-                Err(e) => CommandResult {
-                    ip,
-                    success: false,
-                    error: Some(e),
-                },
+    } else {
+        // Default (Antminer) behavior
+        match command {
+            MinerCommand::Reboot => {
+                // Reboot uses the HTTP web interface with Digest Auth
+                match reboot_via_http(&ip, &antminer_creds.username, &antminer_creds.password).await {
+                    Ok(_) => CommandResult {
+                        ip,
+                        success: true,
+                        error: None,
+                    },
+                    Err(e) => CommandResult {
+                        ip,
+                        success: false,
+                        error: Some(e),
+                    },
+                }
             }
-        }
-        MinerCommand::StopBlink => {
-            // Modern Antminers use HTTP API for blink control
-            match blink_led_via_http(&ip, &credentials.username, &credentials.password, false).await {
-                Ok(_) => CommandResult {
-                    ip,
-                    success: true,
-                    error: None,
-                },
-                Err(e) => CommandResult {
-                    ip,
-                    success: false,
-                    error: Some(e),
-                },
+            MinerCommand::BlinkLed => {
+                match blink_led_via_http(&ip, &antminer_creds.username, &antminer_creds.password, true).await {
+                    Ok(_) => CommandResult {
+                        ip,
+                        success: true,
+                        error: None,
+                    },
+                    Err(e) => CommandResult {
+                        ip,
+                        success: false,
+                        error: Some(e),
+                    },
+                }
+            }
+            MinerCommand::StopBlink => {
+                match blink_led_via_http(&ip, &antminer_creds.username, &antminer_creds.password, false).await {
+                    Ok(_) => CommandResult {
+                        ip,
+                        success: true,
+                        error: None,
+                    },
+                    Err(e) => CommandResult {
+                        ip,
+                        success: false,
+                        error: Some(e),
+                    },
+                }
             }
         }
     }
