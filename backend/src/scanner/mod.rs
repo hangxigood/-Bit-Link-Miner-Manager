@@ -192,7 +192,7 @@ async fn scan_single_ip(ip: IpAddr, config: &ScanConfig) -> Option<Miner> {
     // Try each port
     for &port in &config.ports {
         // Try to get version first (lightweight check)
-        if let Ok(version_response) = send_command(
+        if let Ok(_version_response) = send_command(
             &ip.to_string(),
             port,
             "version",
@@ -203,8 +203,8 @@ async fn scan_single_ip(ip: IpAddr, config: &ScanConfig) -> Option<Miner> {
                 .await
                 .unwrap_or_default();
             
-            // Try to extract model from version response
-            let model = extract_model_from_version(&version_response);
+            // Miner model is now handled by the Parser::get_summary -> parse_version_data / fetch_details
+            let model = stats.model.clone();
             
             // Determine status based on stats
             let status = determine_status_from_stats(&stats);
@@ -222,26 +222,6 @@ async fn scan_single_ip(ip: IpAddr, config: &ScanConfig) -> Option<Miner> {
         }
     }
     
-    None
-}
-
-/// Extract miner model from version response
-fn extract_model_from_version(response: &str) -> Option<String> {
-    // Clean the response first (miners send trailing characters)
-    let cleaned = crate::utils::extract_clean_json(response)?;
-    
-    // Try to parse JSON and extract Type field
-    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cleaned) {
-        if let Some(version) = json.get("VERSION") {
-            if let Some(version_array) = version.as_array() {
-                if let Some(first) = version_array.first() {
-                    if let Some(model_type) = first.get("Type") {
-                        return model_type.as_str().map(String::from);
-                    }
-                }
-            }
-        }
-    }
     None
 }
 

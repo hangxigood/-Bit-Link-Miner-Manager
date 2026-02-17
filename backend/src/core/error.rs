@@ -20,6 +20,21 @@ pub enum MinerError {
     
     #[error("Invalid response format")]
     InvalidResponse,
+
+    #[error("Error: {0}")]
+    GenericError(String),
+}
+
+impl From<String> for MinerError {
+    fn from(s: String) -> Self {
+        MinerError::GenericError(s)
+    }
+}
+
+impl From<&str> for MinerError {
+    fn from(s: &str) -> Self {
+        MinerError::GenericError(s.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, MinerError>;
