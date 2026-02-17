@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:frontend/src/controllers/dashboard_controller.dart';
-import 'package:frontend/src/rust/api/commands.dart';
+import 'package:frontend/src/rust/api/commands.dart' as commands;
+import 'package:frontend/src/rust/api/commands.dart' show MinerCommand, CommandResult;
 import 'package:frontend/src/rust/api/models.dart';
 import 'package:frontend/src/rust/core/models.dart';
+import 'package:frontend/src/rust/core/config.dart';
 import 'package:frontend/src/widgets/reboot_progress_dialog.dart';
 import 'package:frontend/src/widgets/reboot_config_dialog.dart';
 
@@ -11,14 +13,25 @@ class ActionController {
   final DashboardController _dashboardController;
   final Function(String) _onShowToast;
   final Future<List<Miner>> Function()? _onTriggerScan;
+  final Future<List<CommandResult>> Function({
+    required List<String> targetIps,
+    required MinerCommand command,
+    MinerCredentials? credentials,
+  }) _executeBatchCommand;
 
   ActionController({
     required DashboardController dashboardController,
     required Function(String) onShowToast,
     Future<List<Miner>> Function()? onTriggerScan,
+    Future<List<CommandResult>> Function({
+      required List<String> targetIps,
+      required MinerCommand command,
+      MinerCredentials? credentials,
+    })? executeBatchCommand,
   })  : _dashboardController = dashboardController,
         _onShowToast = onShowToast,
-        _onTriggerScan = onTriggerScan;
+        _onTriggerScan = onTriggerScan,
+        _executeBatchCommand = executeBatchCommand ?? commands.executeBatchCommand;
 
   // --- Scanning ---
 
@@ -68,12 +81,13 @@ class ActionController {
       return;
     }
 
-    // Check if we have any blinking IPs
-    final isBlinking = _dashboardController.blinkingIps.isNotEmpty;
+    // Check if any of the selected IPs are currently blinking
+    // This fixes the regression where blinking state was global.
+    final isBlinking = selectedIps.any((ip) => _dashboardController.blinkingIps.contains(ip));
 
     try {
       if (isBlinking) {
-        final results = await executeBatchCommand(
+        final results = await _executeBatchCommand(
           targetIps: selectedIps,
           command: MinerCommand.stopBlink,
         );
@@ -88,7 +102,7 @@ class ActionController {
         
         _onShowToast('Stopped blinking: $successCount/${selectedIps.length} successful');
       } else {
-        final results = await executeBatchCommand(
+        final results = await _executeBatchCommand(
           targetIps: selectedIps,
           command: MinerCommand.blinkLed,
         );
@@ -154,7 +168,7 @@ class ActionController {
 
   Future<void> _executeRebootImmediate(List<String> ips) async {
     try {
-      final results = await executeBatchCommand(
+      final results = await _executeBatchCommand(
         targetIps: ips,
         command: MinerCommand.reboot,
       );
@@ -219,7 +233,7 @@ class ActionController {
       );
 
       try {
-        final results = await executeBatchCommand(
+        final results = await _executeBatchCommand(
           targetIps: batches[i],
           command: MinerCommand.reboot,
         );

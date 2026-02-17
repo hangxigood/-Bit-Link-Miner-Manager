@@ -29,17 +29,10 @@ class ActionBar extends StatelessWidget {
     // Original logic: `_isBlinking` state. 
     // New logic: Check if we are actively locating.
     // If we have blinking IPs, we probably want to stop them?
-    final isBlinking = blinkingIps.isNotEmpty;
-    // Or more specifically for selected?
-    // If selected is empty, blinkingIps state determines global button state?
-    // The button is disabled if selected is empty.
-    // So we only care if selected IPs are blinking.
-    // Actually, let's stick to simple "isBlinking" = global state for now as DashboardController tracks it globally?
-    // DashboardController tracks a Set of IPs.
-    // If we select a subset, do we want to know if *they* are blinking?
-    // Yes, usually.
-    // But `isBlinking` in previous code was a single boolean.
-    // Let's use `blinkingIps.isNotEmpty`.
+    // Determine if we are in "blink mode" for the selected IPs
+    // If ANY selected IP is blinking, we show "Stop Locate".
+    // We don't need isBlinking state here anymore since button is removed
+    // final isBlinking = selectedIps.any((ip) => blinkingIps.contains(ip));
 
     return Container(
       padding: EdgeInsets.all(12),
@@ -154,38 +147,6 @@ class ActionBar extends StatelessWidget {
             ),
           ),
           
-          // Vertical divider
-          Container(
-            width: 1,
-            height: 24,
-            color: context.border,
-          ),
-          
-          // Locate (Blink LED) - Toggle button
-          OutlinedButton.icon(
-            onPressed: selectedIps.isEmpty ? null : () => actionController.toggleLocate(selectedIps),
-            icon: Icon(
-              isBlinking ? Icons.location_disabled : Icons.location_searching,
-              size: 16,
-            ),
-            label: Text(
-              isBlinking
-                  ? 'Stop Locate'
-                  : (selectedIps.isEmpty
-                      ? 'Locate'
-                      : 'Locate (${selectedIps.length})'),
-              style: selectedIps.isNotEmpty && !isBlinking
-                  ? TextStyle(fontFamily: 'monospace')
-                  : null,
-            ),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: isBlinking ? Colors.orange.withValues(alpha: 0.1) : null,
-              foregroundColor: isBlinking ? Colors.orange : null,
-              side: isBlinking
-                  ? BorderSide(color: Colors.orange, width: 1.5)
-                  : null,
-            ),
-          ),
         ],
       ),
     );
