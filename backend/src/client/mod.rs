@@ -3,7 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::time::timeout;
+use tokio::time::{timeout, timeout_at};
+
+pub mod parsers;
+pub mod whatsminer_web;
+use parsers::{MinerParser, AntminerParser, WhatsminerParser};
 
 /// Default CGMiner API port
 pub const DEFAULT_PORT: u16 = 4028;
@@ -33,27 +37,49 @@ struct StatusInfo {
     status: String,
     #[serde(rename = "Msg")]
     _msg: String,
+    #[serde(rename = "Description")]
+    description: Option<String>,
 }
 
 /// Summary data from CGMiner (supports both Antminer and Whatsminer formats)
 #[derive(Debug, Deserialize)]
-struct SummaryData {
+pub struct SummaryData {
     #[serde(rename = "Elapsed")]
-    elapsed: Option<u64>,
+    pub elapsed: Option<u64>,
     
     // Antminer format
     #[serde(rename = "MHS av")]
-    mhs_av: Option<f64>,
+    pub mhs_av: Option<f64>,
     
     // Whatsminer format
+    #[serde(rename = "MHS 5s")]
+    pub mhs_5s: Option<f64>,
+
     #[serde(rename = "HS 5s")]
-    hs_5s: Option<String>,
+    pub hs_5s: Option<String>,
     
     #[serde(rename = "GHS 5s")]
-    ghs_5s: Option<f64>,
+    pub ghs_5s: Option<f64>,
 
     #[serde(rename = "GHS av")]
-    ghs_av: Option<f64>,
+    pub ghs_av: Option<f64>,
+
+    // Whatsminer Specifics
+    #[serde(rename = "Chip Temp Min")]
+    pub chip_temp_min: Option<f64>,
+    #[serde(rename = "Chip Temp Max")]
+    pub chip_temp_max: Option<f64>,
+    
+    #[serde(rename = "Fan Speed In")]
+    pub fan_speed_in: Option<u64>,
+    #[serde(rename = "Fan Speed Out")]
+    pub fan_speed_out: Option<u64>,
+
+    #[serde(rename = "Temperature")]
+    pub temperature: Option<f64>,
+
+    #[serde(rename = "Firmware Version")]
+    pub firmware_version: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,11 +173,10 @@ pub async fn get_summary(
     port: u16,
     timeout_ms: u64,
 ) -> Result<MinerStats> {
-    // 1. Get Summary (Main health check)
+    // 1. Get Summary (Main health check & Type detection)
     let response_str = send_command(ip, port, "summary", timeout_ms).await?;
     
-    // Real miners often send trailing null bytes or extra characters
-    // Find the actual JSON bounds and parse only that portion
+    // Clean response
     let json_str = crate::utils::extract_clean_json(&response_str)
         .unwrap_or_else(|| response_str.trim_matches(|c: char| c.is_whitespace() || c == '\0').to_string());
     
@@ -159,66 +184,44 @@ pub async fn get_summary(
     let response: CgMinerResponse = serde_json::from_str(&json_str)?;
     
     // Check status
-    if let Some(status) = response.status.first() {
-        if status.status != "S" {
-            return Err(MinerError::InvalidResponse);
-        }
-    }
+    let status_desc_raw = response.status.first().and_then(|s| s.description.clone());
+    let status_desc = status_desc_raw.as_deref().unwrap_or_default().to_lowercase();
     
     // Extract summary data
     let summary = response
         .summary
         .and_then(|s| s.into_iter().next())
         .ok_or(MinerError::InvalidResponse)?;
+
+    // 2. Detect Miner Type
+    let is_whatsminer = summary.firmware_version.is_some() || status_desc.contains("whatsminer");
     
-    // Convert to MinerStats (base)
-    let mut stats = parse_summary_to_stats(summary)?;
+    let parser = if is_whatsminer {
+        MinerParser::Whatsminer(WhatsminerParser)
+    } else {
+        MinerParser::Antminer(AntminerParser)
+    };
 
-    // 2. Get Detailed Stats (Temps, Fans)
-    if let Ok(stats_json) = send_command(ip, port, "stats", timeout_ms).await {
-        if let Some(clean_json) = crate::utils::extract_clean_json(&stats_json) {
-            let (outlet_min, outlet_max, inlet_min, inlet_max, fans) = parse_stats_data(&clean_json);
-            stats.temp_outlet_min = outlet_min;
-            stats.temp_outlet_max = outlet_max;
-            stats.temp_inlet_min = inlet_min;
-            stats.temp_inlet_max = inlet_max;
-            stats.fan_speeds = fans;
+    // 3. Parse Base Stats
+    let mut stats = parser.parse_summary(&summary)?;
+
+    // If Whatsminer, update software field from Status Description if available
+    if is_whatsminer {
+        if let Some(desc) = status_desc_raw {
+            if !desc.is_empty() {
+                stats.software = Some(desc);
+            }
         }
     }
 
-    // 3. Get Pools (Active Pool/Worker)
-    if let Ok(pools_json) = send_command(ip, port, "pools", timeout_ms).await {
-        if let Some(clean_json) = crate::utils::extract_clean_json(&pools_json) {
-            let (p1, w1, p2, w2, p3, w3) = parse_pools_data(&clean_json);
-            stats.pool1 = p1;
-            stats.worker1 = w1;
-            stats.pool2 = p2;
-            stats.worker2 = w2;
-            stats.pool3 = p3;
-            stats.worker3 = w3;
-        }
-    }
-
-    // 4. Get Version (Hardware/Firmware/Model)
-    if let Ok(version_json) = send_command(ip, port, "version", timeout_ms).await {
-        if let Some(clean_json) = crate::utils::extract_clean_json(&version_json) {
-            let (hw, fw, sw, model) = parse_version_data(&clean_json);
-            stats.hardware = hw;
-            stats.firmware = fw;
-            stats.software = sw;
-            stats.model = model;
-        }
-    }
-
-    // 5. Get MAC Address (via ARP table lookup)
-    stats.mac_address = lookup_mac_address(ip).await;
+    // 4. Fetch Details (Model, Temps, Fans, Pools, etc.)
+    parser.fetch_details(ip, port, timeout_ms, &mut stats).await?;
     
     Ok(stats)
 }
 
 /// Look up a device's MAC address from the OS ARP table.
-/// After a successful TCP connection, the ARP cache should have an entry for this IP.
-async fn lookup_mac_address(ip: &str) -> Option<String> {
+pub(crate) async fn lookup_mac_address(ip: &str) -> Option<String> {
     let output = if cfg!(target_os = "macos") {
         match tokio::process::Command::new("arp")
             .arg("-n")
@@ -257,20 +260,9 @@ async fn lookup_mac_address(ip: &str) -> Option<String> {
         return None;
     }
 
-    match parse_mac_from_arp_output(&stdout) {
-        Some(mac) => Some(mac),
-        None => {
-            // Only log if we have output but failed to parse it (indicates unexpected format)
-            eprintln!("[MAC] Failed to parse MAC from ARP output for {}: '{}'", ip, stdout.trim());
-            None
-        }
-    }
+    parse_mac_from_arp_output(&stdout)
 }
 
-/// Parse MAC address from ARP command output.
-/// macOS format: "? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0 ..."
-/// Linux format: "192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE"
-/// Note: macOS sometimes shortens segments (e.g., "72:3c:e:95:5d:83" instead of "72:3c:0e:95:5d:83")
 fn parse_mac_from_arp_output(output: &str) -> Option<String> {
     // Look for a MAC address pattern: xx:xx:xx:xx:xx:xx (with possible single-digit segments)
     for word in output.split_whitespace() {
@@ -306,58 +298,8 @@ fn parse_mac_from_arp_output(output: &str) -> Option<String> {
     None
 }
 
-
-/// Parse summary data into MinerStats, handling different miner models
-fn parse_summary_to_stats(summary: SummaryData) -> Result<MinerStats> {
-    // Determine hashrate based on available fields
-    let hashrate_avg = if let Some(mhs) = summary.mhs_av {
-        // Antminer format: MHS (MH/s) -> convert to TH/s
-        mhs / 1_000_000.0
-    } else if let Some(ghs) = summary.ghs_av {
-        // GHS (GH/s) -> convert to TH/s
-        ghs / 1000.0
-    } else if let Some(hs_5s) = &summary.hs_5s {
-         // Whatsminer format often puts avg in 5s? No, typically avg is elsewhere
-         // For now fallback to parsing 5s as avg if nothing else
-        parse_hashrate_string(hs_5s)?
-    } else {
-        0.0
-    };
-
-    // Determine Real-Time Hashrate
-    let hashrate_rt = if let Some(ghs_5s) = summary.ghs_5s {
-        ghs_5s / 1000.0
-    } else if let Some(hs_5s) = &summary.hs_5s {
-        parse_hashrate_string(hs_5s)?
-    } else {
-        hashrate_avg // Fallback
-    };
-    
-    Ok(MinerStats {
-        hashrate_rt,
-        hashrate_avg,
-        temp_outlet_min: Vec::new(), // Will be populated from detailed stats
-        temp_outlet_max: Vec::new(),
-        temp_inlet_min: Vec::new(),
-        temp_inlet_max: Vec::new(),
-        fan_speeds: Vec::new(),
-        uptime: summary.elapsed.unwrap_or(0),
-        pool1: None,
-        worker1: None,
-        pool2: None,
-        worker2: None,
-        pool3: None,
-        worker3: None,
-        model: None,
-        firmware: None,
-        software: None,
-        hardware: None,
-        mac_address: None,
-    })
-}
-
 /// Parse hashrate strings like "13.5T" or "13500G" to TH/s
-fn parse_hashrate_string(s: &str) -> Result<f64> {
+pub(crate) fn parse_hashrate_string(s: &str) -> Result<f64> {
     let s = s.trim();
     
     if s.ends_with('T') {
@@ -369,11 +311,17 @@ fn parse_hashrate_string(s: &str) -> Result<f64> {
             .map_err(|_| MinerError::InvalidResponse)?;
         Ok(num / 1000.0)
     } else {
+        // Try parsing as number directly? Some send raw number
+         if let Ok(num) = s.parse::<f64>() {
+             return Ok(num);
+         }
+        // If it's something like "13.5 TH/s", we might need more robust parsing
+        // But for now sticking to existing behavior
         Err(MinerError::InvalidResponse)
     }
 }
 
-fn parse_stats_data(json: &str) -> (Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<u32>>) {
+pub(crate) fn parse_stats_data(json: &str) -> (Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<f64>>, Vec<Option<u32>>) {
     let mut temp_outlet_min = vec![None, None, None]; // Chip temps min (outlet)
     let mut temp_outlet_max = vec![None, None, None]; // Chip temps max (outlet)
     let mut temp_inlet_min = vec![None, None, None];  // PCB temps min (inlet)
@@ -393,25 +341,24 @@ fn parse_stats_data(json: &str) -> (Vec<Option<f64>>, Vec<Option<f64>>, Vec<Opti
                                 }
                             }
                         } else if k == "fan2" {
-                            if let Some(speed) = v.as_u64() {
+                             if let Some(speed) = v.as_u64() {
                                 if speed > 0 {
                                     fans[1] = Some(speed as u32);
                                 }
                             }
                         } else if k == "fan3" {
-                            if let Some(speed) = v.as_u64() {
+                             if let Some(speed) = v.as_u64() {
                                 if speed > 0 {
                                     fans[2] = Some(speed as u32);
                                 }
                             }
                         } else if k == "fan4" {
-                            if let Some(speed) = v.as_u64() {
+                             if let Some(speed) = v.as_u64() {
                                 if speed > 0 {
                                     fans[3] = Some(speed as u32);
                                 }
                             }
                         }
-
                         // Parse specific chip temp indices: temp_chip1, temp_chip2, temp_chip3
                         else if k == "temp_chip1" {
                             let (min, max) = parse_temp_min_max(v);
@@ -426,7 +373,6 @@ fn parse_stats_data(json: &str) -> (Vec<Option<f64>>, Vec<Option<f64>>, Vec<Opti
                             temp_outlet_min[2] = min;
                             temp_outlet_max[2] = max;
                         }
-
                         // Parse specific PCB temp indices: temp_pcb1, temp_pcb2, temp_pcb3
                         else if k == "temp_pcb1" {
                             let (min, max) = parse_temp_min_max(v);
@@ -481,7 +427,7 @@ fn parse_temp_string(s: &str) -> (Option<f64>, Option<f64>) {
     (min, max)
 }
 
-fn parse_pools_data(json: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>) {
+pub(crate) fn parse_pools_data(json: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>) {
     if let Ok(resp) = serde_json::from_str::<CgMinerPoolsResponse>(json) {
         if let Some(pools) = resp.pools {
              let mut sorted_pools: Vec<&PoolData> = pools.iter().collect();
@@ -502,7 +448,7 @@ fn parse_pools_data(json: &str) -> (Option<String>, Option<String>, Option<Strin
     (None, None, None, None, None, None)
 }
 
-fn parse_version_data(json: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+pub(crate) fn parse_version_data(json: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
     if let Ok(resp) = serde_json::from_str::<CgMinerVersionResponse>(json) {
         if let Some(versions) = resp.version {
             if let Some(v) = versions.first() {

@@ -7,12 +7,14 @@ The application uses a **Split Architecture**: Rust for high-performance backend
 ```mermaid
 graph TD
     UI[Flutter Frontend] <-->|FFI Stream| API[Rust API Facade]
+    API --> Config[Settings & State]
     API --> Scanner[Scanner Module]
     API --> Monitor[Monitor Module]
     API --> Cmd[Command Executor]
     
     Scanner -->|TCP Handshake| Network
     Monitor -->|CGMiner API| Network
+    Cmd -->|Web API| Network
 ```
 
 ---
@@ -23,27 +25,38 @@ This table defines the responsibility of each module in the codebase.
 | Path | Module | Responsibility |
 | :--- | :--- | :--- |
 | **Backend** | | |
-| `backend/src/api/` | **Facade** | The FFI boundary. Only functions here are exposed to Dart. |
+| `backend/src/api/` | **Facade** | FFI boundary (`lib.rs`, `simple.rs`, `settings.rs`) and sub-modules (`commands`, `monitor`, `scanner`) exposed to Dart. |
+| `backend/src/core/config.rs` | **Config** | `AppSettings` struct. Handles JSON persistence of credentials & scan settings. |
 | `backend/src/scanner/` | **Discovery** | Logic for `scan_range`. Manages thread pool & semaphores. |
 | `backend/src/monitor/` | **State** | The polling loop. Maintains `DashMap<IP, MinerStats>`. |
-| `backend/src/client/` | **Protocol** | `CGMinerClient`. Handshakes, JSON parsing, error handling. |
-| `backend/src/core/` | **Domain** | Shared types: `Miner`, `MinerStats`, `MinerStatus`. |
+| `backend/src/client/` | **Protocol** | `CGMinerClient` (TCP) & `WhatsminerWebClient` (HTTP). Handshakes, JSON parsing. |
+| `backend/src/core/` | **Domain** | Shared types: `Miner`, `MinerStats`, `MinerStatus`, `MinerCredentials`. |
+| `backend/src/utils.rs` | **Utils** | Shared utilities (e.g., JSON cleanup). |
 | **Frontend** | | |
 | `frontend/lib/src/rust/` | **Bridge** | Auto-generated FFI code (Do not edit manually). |
-| `frontend/lib/src/widgets/` | **UI** | Reusable components (`MinerDataTable`, `Sidebar`). |
-| `frontend/lib/src/services/` | **Logic** | Client-side persistence (`Credentials`, `IpRanges`). |
+| `frontend/lib/src/controllers/` | **State** | Logic & State Management (`ActionController`, `DashboardController`). |
+| `frontend/lib/src/widgets/` | **UI** | Reusable components (`MinerDataTable`, `DashboardShell`, `SettingsDialog`). |
+| `frontend/lib/src/constants/` | **Config** | Shared constants (`ColumnConstants`). |
+| `frontend/lib/src/theme/` | **Style** | App implementation of design system. |
 
 ---
 
 ## 3. Core Data Structures (`backend/src/core/mod.rs`)
 
-### 3.1 `Miner`
+### 3.1 `AppSettings` (New)
+Persisted in `app_settings.json` via `backend/src/core/config.rs`.
+*   **antminer_credentials**: `MinerCredentials` (User/Pass)
+*   **whatsminer_credentials**: `MinerCredentials` (User/Pass)
+*   **scan_thread_count**: `u32`
+*   **monitor_interval**: `u64`
+
+### 3.2 `Miner`
 Represents the **identity** of a device.
 *   **ip**: `String` (Unique Key)
 *   **mac**: `Option<String>`
 *   **model**: `String` (e.g., "S19 Pro")
 
-### 3.2 `MinerStats`
+### 3.3 `MinerStats`
 Represents the **telemetry** of a device at a specific point in time.
 *   **hashrate_rt**: `f64` (Real-time 5s average)
 *   **hashrate_avg**: `f64` (Session average)
@@ -55,7 +68,7 @@ Represents the **telemetry** of a device at a specific point in time.
 *   **software**: `Option<String>`
 *   **hardware**: `Option<String>`
 
-### 3.3 `MinerStatus` (Enum)
+### 3.4 `MinerStatus` (Enum)
 Logic for classifying device health:
 *   **Active**: `Hashrate > Limit` && `Temp < Limit`
 *   **Warning**: Performance degraded.
@@ -96,12 +109,15 @@ sequenceDiagram
 ```
 
 ### 4.3 Staggered Batch Execution
-**Module:** `backend/src/api/commands.rs` (Implementation concept)
+**Module:** `backend/src/api/commands.rs`
 
 Goal: Execute a command on N miners without tripping breakers.
-1.  **Queue**: Receives `Vec<IP>` and `Command`.
-2.  **Batching**: Slices IPs into chunks of `BatchSize` (User Config).
-3.  **Loop**:
+1.  **Input**: Target IPs, `MinerCommand`.
+2.  **Config**: Loads `AppSettings` to get credential sets.
+3.  **Routing**:
+    *   **Whatsminer**: Uses `WhatsminerWebClient` with `whatsminer_credentials`.
+    *   **Antminer**: Uses Digest Auth with `antminer_credentials`.
+4.  **Loop**:
     *   Execute chunk concurrently (`join_all`).
     *   `sleep(DelaySeconds)`.
     *   Report progress callback to UI.
@@ -111,12 +127,14 @@ Goal: Execute a command on N miners without tripping breakers.
 ## 5. FFI Boundary (Rust -> Dart)
 These functions in `backend/src/api/` are the **only** entry points for the UI.
 
-1.  `start_scan(range: String) -> Stream<ScanEvent>`
-2.  `stop_scan()`
-3.  `start_monitoring(ips: Vec<String>) -> Stream<MonitorEvent>`
-4.  `stop_monitoring()`
-5.  `execute_command(ips: Vec<String>, cmd: MinerCommand, delay: u64, batch_size: usize)`
-6.  `detect_local_ranges() -> Vec<String>`
+1.  `get_app_settings() -> AppSettings`
+2.  `save_app_settings(settings: AppSettings)`
+3.  `start_scan(range: String) -> Stream<ScanEvent>`
+4.  `stop_scan()`
+5.  `start_monitoring(ips: Vec<String>) -> Stream<MonitorEvent>`
+6.  `stop_monitoring()`
+7.  `execute_command(ips: Vec<String>, cmd: MinerCommand, delay: u64, batch_size: usize)`
+8.  `detect_local_ranges() -> Vec<String>`
 
 ---
 
