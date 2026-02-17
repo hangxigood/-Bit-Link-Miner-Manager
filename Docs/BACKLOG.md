@@ -55,6 +55,8 @@ This document tracks the execution status of features defined in [PRD.md](PRD.md
     - [x] Formatted as `min | max`.
 - [x] **UX Improvements**:
     - [x] **Auto Scan Button**: Renamed to "Detect".
+    - [x] **Locate Toggle Refactor**: Remove global button, rely on selection-aware table toggles.
+    - [x] **ActionController**: Refactored for testability and bug fixes.
 
 ---
 
