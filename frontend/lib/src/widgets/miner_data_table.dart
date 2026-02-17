@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/theme/app_theme.dart';
-import 'package:frontend/src/services/credentials_service.dart';
+import 'package:frontend/src/rust/api/settings.dart';
 import 'package:frontend/src/widgets/column_settings_dialog.dart';
 import 'package:frontend/src/models/data_column_config.dart';
 import 'package:frontend/src/constants/column_constants.dart';
@@ -276,8 +276,15 @@ class MinerDataTable extends StatelessWidget {
     return InkWell(
       onTap: () async {
         // Get credentials from settings
-        final username = await CredentialsService.getUsername();
-        final password = await CredentialsService.getPassword();
+        final settings = getAppSettings();
+        String username = settings.antminerCredentials.username;
+        String password = settings.antminerCredentials.password;
+
+        if (miner.model?.toLowerCase().contains('whatsminer') == true || 
+            miner.stats.firmware?.toLowerCase().contains('whatsminer') == true) {
+          username = settings.whatsminerCredentials.username;
+          password = settings.whatsminerCredentials.password;
+        }
         
         // Embed credentials for auto-login (Digest Auth)
         final url = Uri.parse('http://$username:$password@${miner.ip}');

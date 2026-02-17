@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/src/services/credentials_service.dart';
 import 'package:frontend/src/theme/app_theme.dart';
+import 'package:frontend/src/rust/api/settings.dart';
+import 'package:frontend/src/rust/core/config.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
@@ -13,65 +14,95 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
   late TabController _tabController;
   
   // Credentials
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _antminerUserCtrl = TextEditingController();
+  final _antminerPassCtrl = TextEditingController();
+  final _whatsminerUserCtrl = TextEditingController();
+  final _whatsminerPassCtrl = TextEditingController();
+  bool _obscureAntminerPass = true;
+  bool _obscureWhatsminerPass = true;
+
   bool _isLoading = true;
-  bool _obscurePassword = true;
   
   // General settings
   double _scanThreadCount = 32;
   double _monitorInterval = 30;
   
-  // Alert settings
+  // Alert settings (Local only for now, or could be part of AppSettings eventually)
   bool _tempAlertsEnabled = false;
   double _tempThreshold = 85;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadCredentials();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadSettings();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _antminerUserCtrl.dispose();
+    _antminerPassCtrl.dispose();
+    _whatsminerUserCtrl.dispose();
+    _whatsminerPassCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadCredentials() async {
-    final username = await CredentialsService.getUsername();
-    final password = await CredentialsService.getPassword();
-    
-    setState(() {
-      _usernameController.text = username;
-      _passwordController.text = password;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _saveCredentials() async {
-    await CredentialsService.setUsername(_usernameController.text);
-    await CredentialsService.setPassword(_passwordController.text);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved successfully')),
-      );
-      Navigator.of(context).pop();
+  Future<void> _loadSettings() async {
+    try {
+      final settings = getAppSettings();
+      
+      if (mounted) {
+        setState(() {
+          _antminerUserCtrl.text = settings.antminerCredentials.username;
+          _antminerPassCtrl.text = settings.antminerCredentials.password;
+          _whatsminerUserCtrl.text = settings.whatsminerCredentials.username;
+          _whatsminerPassCtrl.text = settings.whatsminerCredentials.password;
+          
+          _scanThreadCount = settings.scanThreadCount.toDouble();
+          _monitorInterval = settings.monitorInterval.toDouble();
+          
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load settings: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _resetToDefaults() async {
-    await CredentialsService.resetToDefaults();
-    await _loadCredentials();
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reset to default credentials (root/root)')),
-      );
+  Future<void> _saveSettings() async {
+    final settings = AppSettings(
+      antminerCredentials: MinerCredentials(
+        username: _antminerUserCtrl.text,
+        password: _antminerPassCtrl.text,
+      ),
+      whatsminerCredentials: MinerCredentials(
+        username: _whatsminerUserCtrl.text,
+        password: _whatsminerPassCtrl.text,
+      ),
+      scanThreadCount: _scanThreadCount.toInt(),
+      monitorInterval: BigInt.from(_monitorInterval.toInt()),
+    );
+
+    try {
+      saveAppSettings(settings: settings);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Settings saved successfully')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save settings: $e')),
+        );
+      }
     }
   }
 
@@ -94,13 +125,14 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           ? Center(child: CircularProgressIndicator())
           : SizedBox(
               width: 600,
-              height: 400,
+              height: 450,
               child: Column(
                 children: [
                   TabBar(
                     controller: _tabController,
                     tabs: [
                       Tab(text: 'General'),
+                      Tab(text: 'Credentials'),
                       Tab(text: 'Alerts'),
                     ],
                   ),
@@ -109,6 +141,7 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
                       controller: _tabController,
                       children: [
                         _buildGeneralTab(),
+                        _buildCredentialsTab(),
                         _buildAlertsTab(),
                       ],
                     ),
@@ -122,7 +155,7 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: _saveCredentials,
+          onPressed: _saveSettings,
           child: const Text('Save'),
         ),
       ],
@@ -141,7 +174,6 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           ),
           SizedBox(height: 16),
           
-          // Scan thread count slider
           Text(
             'Scan Thread Count: ${_scanThreadCount.toInt()}',
             style: TextStyle(fontSize: 12),
@@ -161,7 +193,6 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           
           SizedBox(height: 16),
           
-          // Monitor interval slider
           Text(
             'Monitor Interval: ${_monitorInterval.toInt()} seconds',
             style: TextStyle(fontSize: 12),
@@ -183,6 +214,93 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
     );
   }
 
+  Widget _buildCredentialsTab() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCredentialSection(
+            title: 'Antminer Credentials',
+            description: 'Default credentials for Antminer devices.',
+            userCtrl: _antminerUserCtrl,
+            passCtrl: _antminerPassCtrl,
+            obscurePass: _obscureAntminerPass,
+            onToggleObscure: () {
+              setState(() {
+                _obscureAntminerPass = !_obscureAntminerPass;
+              });
+            },
+          ),
+          SizedBox(height: 24),
+          Divider(),
+          SizedBox(height: 24),
+          _buildCredentialSection(
+            title: 'Whatsminer Credentials',
+            description: 'Default credentials for Whatsminer devices.',
+            userCtrl: _whatsminerUserCtrl,
+            passCtrl: _whatsminerPassCtrl,
+            obscurePass: _obscureWhatsminerPass,
+            onToggleObscure: () {
+              setState(() {
+                _obscureWhatsminerPass = !_obscureWhatsminerPass;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCredentialSection({
+    required String title,
+    required String description,
+    required TextEditingController userCtrl,
+    required TextEditingController passCtrl,
+    required bool obscurePass,
+    required VoidCallback onToggleObscure,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        SizedBox(height: 8),
+        Text(
+          description,
+          style: TextStyle(fontSize: 11, color: Theme.of(context).hintColor),
+        ),
+        SizedBox(height: 16),
+        TextField(
+          controller: userCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Username',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.person),
+          ),
+        ),
+        SizedBox(height: 12),
+        TextField(
+          controller: passCtrl,
+          obscureText: obscurePass,
+          decoration: InputDecoration(
+            labelText: 'Password',
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.lock),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscurePass ? Icons.visibility : Icons.visibility_off,
+              ),
+              onPressed: onToggleObscure,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAlertsTab() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
@@ -195,7 +313,6 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           ),
           SizedBox(height: 16),
           
-          // Temp alerts toggle
           Row(
             children: [
               Switch(
@@ -216,7 +333,6 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           
           SizedBox(height: 16),
           
-          // Temp threshold slider
           Text(
             'Alert Threshold: ${_tempThreshold.toInt()}°C',
             style: TextStyle(fontSize: 12),
@@ -234,56 +350,6 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
                     });
                   }
                 : null,
-          ),
-          
-          SizedBox(height: 24),
-          Divider(),
-          SizedBox(height: 16),
-          
-          Text(
-            'SSH Credentials',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Default credentials for accessing miner web interfaces and sending commands.',
-            style: TextStyle(fontSize: 11, color: context.mutedText),
-          ),
-          SizedBox(height: 16),
-          
-          TextField(
-            controller: _usernameController,
-            decoration: const InputDecoration(
-              labelText: 'Username',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.person),
-            ),
-          ),
-          SizedBox(height: 12),
-          TextField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.lock),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
-            ),
-          ),
-          SizedBox(height: 12),
-          TextButton.icon(
-            onPressed: _resetToDefaults,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reset to Defaults (root/root)'),
           ),
         ],
       ),
