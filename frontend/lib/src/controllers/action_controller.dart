@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:frontend/src/controllers/dashboard_controller.dart';
 import 'package:frontend/src/rust/api/commands.dart' as commands;
-import 'package:frontend/src/rust/api/commands.dart' show MinerCommand, CommandResult;
+import 'package:frontend/src/rust/api/commands.dart' show MinerCommand, CommandResult, setMinerPools;
 import 'package:frontend/src/rust/api/models.dart';
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/rust/core/config.dart';
@@ -32,6 +32,10 @@ class ActionController {
         _onShowToast = onShowToast,
         _onTriggerScan = onTriggerScan,
         _executeBatchCommand = executeBatchCommand ?? commands.executeBatchCommand;
+  /// Apply pool config to a single miner. Used internally by DashboardShell
+  /// for concurrent pool+power-mode dispatch.
+  Future<CommandResult> setPoolsForIp(String ip, List<PoolConfig> pools) =>
+      setMinerPools(ip: ip, pools: pools);
 
   // --- Scanning ---
 
@@ -73,7 +77,44 @@ class ActionController {
     }
   }
 
-  // --- Locate / Blink ---
+  // --- Pool Config ---
+
+  /// Push pool configuration to the selected miners.
+  /// Each miner is configured concurrently. The miner will reboot automatically
+  /// after accepting the new pool configuration.
+  Future<void> configSelected(
+    List<String> selectedIps,
+    List<PoolConfig> pools,
+  ) async {
+    if (selectedIps.isEmpty) {
+      _onShowToast('No miners selected');
+      return;
+    }
+    if (pools.isEmpty) {
+      _onShowToast('No pool configured — fill in Pool 1 URL first');
+      return;
+    }
+
+    _onShowToast('Pushing pool config to ${selectedIps.length} miner(s)…');
+
+    final results = await Future.wait(
+      selectedIps.map((ip) => setMinerPools(ip: ip, pools: pools)),
+    );
+
+    final successCount = results.where((r) => r.success).length;
+    final failCount = results.length - successCount;
+
+    if (failCount == 0) {
+      _onShowToast(
+        'Pool config applied to $successCount miner(s). Miners will reboot shortly.',
+      );
+    } else {
+      _onShowToast(
+        'Pool config: $successCount ok, $failCount failed. Check miner credentials.',
+      );
+    }
+  }
+
 
   Future<void> toggleLocate(List<String> selectedIps) async {
     if (selectedIps.isEmpty) {
@@ -89,7 +130,7 @@ class ActionController {
       if (isBlinking) {
         final results = await _executeBatchCommand(
           targetIps: selectedIps,
-          command: MinerCommand.stopBlink,
+          command: const MinerCommand.stopBlink(),
         );
         
         final successCount = results.where((r) => r.success).length;
@@ -104,7 +145,7 @@ class ActionController {
       } else {
         final results = await _executeBatchCommand(
           targetIps: selectedIps,
-          command: MinerCommand.blinkLed,
+          command: const MinerCommand.blinkLed(),
         );
         
         final successCount = results.where((r) => r.success).length;
@@ -170,7 +211,7 @@ class ActionController {
     try {
       final results = await _executeBatchCommand(
         targetIps: ips,
-        command: MinerCommand.reboot,
+        command: const MinerCommand.reboot(),
       );
       final successCount = results.where((r) => r.success).length;
       _onShowToast('Reboot initiated: $successCount/${ips.length} successful');
@@ -235,7 +276,7 @@ class ActionController {
       try {
         final results = await _executeBatchCommand(
           targetIps: batches[i],
-          command: MinerCommand.reboot,
+          command: const MinerCommand.reboot(),
         );
         completedMiners += batches[i].length;
         successCount += results.where((r) => r.success).length;

@@ -205,9 +205,9 @@ class DashboardController extends ChangeNotifier {
 
     try {
       if (shouldBlink) {
-        await executeBatchCommand(targetIps: [ip], command: MinerCommand.blinkLed);
+        await executeBatchCommand(targetIps: [ip], command: const MinerCommand.blinkLed());
       } else {
-        await executeBatchCommand(targetIps: [ip], command: MinerCommand.stopBlink);
+        await executeBatchCommand(targetIps: [ip], command: const MinerCommand.stopBlink());
       }
     } catch (e) {
       // Revert on error

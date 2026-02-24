@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/src/rust/api/models.dart';
 import 'package:frontend/src/theme/app_theme.dart';
 
 class PoolConfigSection extends StatefulWidget {
@@ -7,30 +8,65 @@ class PoolConfigSection extends StatefulWidget {
   const PoolConfigSection({super.key, required this.onShowToast});
 
   @override
-  State<PoolConfigSection> createState() => _PoolConfigSectionState();
+  State<PoolConfigSection> createState() => PoolConfigSectionState();
 }
 
-class _PoolConfigSectionState extends State<PoolConfigSection> {
+class PoolConfigSectionState extends State<PoolConfigSection> {
   // Pool 1
   bool _pool1Enabled = true;
   final _pool1UrlController = TextEditingController();
   final _pool1WorkerController = TextEditingController();
   final _pool1PasswordController = TextEditingController();
-  String _pool1WorkerSuffix = 'ip';
 
   // Pool 2
   bool _pool2Enabled = false;
   final _pool2UrlController = TextEditingController();
   final _pool2WorkerController = TextEditingController();
   final _pool2PasswordController = TextEditingController();
-  String _pool2WorkerSuffix = 'ip';
 
   // Pool 3
   bool _pool3Enabled = false;
   final _pool3UrlController = TextEditingController();
   final _pool3WorkerController = TextEditingController();
   final _pool3PasswordController = TextEditingController();
-  String _pool3WorkerSuffix = 'ip';
+
+  /// Returns the list of enabled pools as [PoolConfig] objects.
+  /// Returns null if no pools are enabled or pool 1 URL is empty.
+  List<PoolConfig>? getEnabledPools() {
+    final pools = <PoolConfig>[];
+
+    if (_pool1Enabled && _pool1UrlController.text.trim().isNotEmpty) {
+      pools.add(PoolConfig(
+        url: _pool1UrlController.text.trim(),
+        worker: _pool1WorkerController.text.trim(),
+        password: _pool1PasswordController.text.trim().isEmpty
+            ? 'x'
+            : _pool1PasswordController.text.trim(),
+      ));
+    }
+
+    if (_pool2Enabled && _pool2UrlController.text.trim().isNotEmpty) {
+      pools.add(PoolConfig(
+        url: _pool2UrlController.text.trim(),
+        worker: _pool2WorkerController.text.trim(),
+        password: _pool2PasswordController.text.trim().isEmpty
+            ? 'x'
+            : _pool2PasswordController.text.trim(),
+      ));
+    }
+
+    if (_pool3Enabled && _pool3UrlController.text.trim().isNotEmpty) {
+      pools.add(PoolConfig(
+        url: _pool3UrlController.text.trim(),
+        worker: _pool3WorkerController.text.trim(),
+        password: _pool3PasswordController.text.trim().isEmpty
+            ? 'x'
+            : _pool3PasswordController.text.trim(),
+      ));
+    }
+
+    return pools.isEmpty ? null : pools;
+  }
 
   @override
   void dispose() {
@@ -78,8 +114,6 @@ class _PoolConfigSectionState extends State<PoolConfigSection> {
           urlController: _pool1UrlController,
           workerController: _pool1WorkerController,
           passwordController: _pool1PasswordController,
-          workerSuffix: _pool1WorkerSuffix,
-          onWorkerSuffixChanged: (value) => setState(() => _pool1WorkerSuffix = value),
         ),
         
         SizedBox(height: 8),
@@ -93,8 +127,6 @@ class _PoolConfigSectionState extends State<PoolConfigSection> {
           urlController: _pool2UrlController,
           workerController: _pool2WorkerController,
           passwordController: _pool2PasswordController,
-          workerSuffix: _pool2WorkerSuffix,
-          onWorkerSuffixChanged: (value) => setState(() => _pool2WorkerSuffix = value),
         ),
         
         SizedBox(height: 8),
@@ -108,8 +140,6 @@ class _PoolConfigSectionState extends State<PoolConfigSection> {
           urlController: _pool3UrlController,
           workerController: _pool3WorkerController,
           passwordController: _pool3PasswordController,
-          workerSuffix: _pool3WorkerSuffix,
-          onWorkerSuffixChanged: (value) => setState(() => _pool3WorkerSuffix = value),
         ),
       ],
     );
@@ -123,8 +153,6 @@ class _PoolConfigSectionState extends State<PoolConfigSection> {
     required TextEditingController urlController,
     required TextEditingController workerController,
     required TextEditingController passwordController,
-    required String workerSuffix,
-    required ValueChanged<String> onWorkerSuffixChanged,
   }) {
     return Container(
       padding: EdgeInsets.all(10),
@@ -212,7 +240,7 @@ class _PoolConfigSectionState extends State<PoolConfigSection> {
                   controller: passwordController,
                   enabled: enabled,
                   decoration: InputDecoration(
-                    hintText: 'Password',
+                    hintText: 'Password (default: x)',
                     hintStyle: TextStyle(fontSize: 10),
                     contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   ),
@@ -221,57 +249,6 @@ class _PoolConfigSectionState extends State<PoolConfigSection> {
                 ),
               ),
             ],
-          ),
-          
-          SizedBox(height: 6),
-          
-          // Worker Suffix radio group
-          Text(
-            'Worker Suffix:',
-            style: TextStyle(fontSize: 10, color: context.mutedText),
-          ),
-          SizedBox(height: 4),
-          Row(
-            children: [
-              _buildRadioOption('IP', 'ip', workerSuffix, onWorkerSuffixChanged, enabled),
-              SizedBox(width: 8),
-              _buildRadioOption('No Change', 'no_change', workerSuffix, onWorkerSuffixChanged, enabled),
-              SizedBox(width: 8),
-              _buildRadioOption('Empty', 'empty', workerSuffix, onWorkerSuffixChanged, enabled),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRadioOption(
-    String label,
-    String value,
-    String currentValue,
-    ValueChanged<String> onChanged,
-    bool enabled,
-  ) {
-    final isSelected = currentValue == value;
-    
-    return InkWell(
-      onTap: enabled ? () => onChanged(value) : null,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Radio<String>(
-            value: value,
-            groupValue: currentValue,
-            onChanged: enabled ? (v) => onChanged(v!) : null,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: enabled ? Theme.of(context).colorScheme.onSurface : context.mutedText,
-            ),
           ),
         ],
       ),
