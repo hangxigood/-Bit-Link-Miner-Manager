@@ -10,6 +10,8 @@ class ActionBar extends StatelessWidget {
   final bool isMonitoring;
   final ActionController actionController;
   final Set<String> blinkingIps;
+  final VoidCallback? onConfigSelected;
+  final VoidCallback? onConfigAll;
 
   const ActionBar({
     super.key,
@@ -19,6 +21,8 @@ class ActionBar extends StatelessWidget {
     required this.isMonitoring,
     required this.actionController,
     required this.blinkingIps,
+    this.onConfigSelected,
+    this.onConfigAll,
   });
 
   @override
@@ -87,21 +91,14 @@ class ActionBar extends StatelessWidget {
           
           // Config All
           OutlinedButton.icon(
-            onPressed: () {
-               // TODO: Config All
-               // This was not implemented in previous code either
-            },
+            onPressed: onConfigAll,
             icon: Icon(Icons.build, size: 16),
             label: Text('Config All'),
           ),
           
           // Config Selected
           OutlinedButton.icon(
-            onPressed: selectedIps.isEmpty
-                ? null
-                : () {
-                    // TODO: Config Selected
-                 },
+            onPressed: selectedIps.isEmpty ? null : onConfigSelected,
             icon: Icon(Icons.build, size: 16),
             label: Text(
               selectedIps.isEmpty

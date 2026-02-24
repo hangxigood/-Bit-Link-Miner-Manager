@@ -30,6 +30,8 @@ class MainContent extends StatelessWidget {
   final Set<String> blinkingIps;
   final VoidCallback onShowColumnSettings;
   final Function(String columnId, double newWidth) onColumnWidthChanged;
+  final VoidCallback? onConfigSelected;
+  final VoidCallback? onConfigAll;
 
   const MainContent({
     super.key,
@@ -55,6 +57,8 @@ class MainContent extends StatelessWidget {
     required this.blinkingIps,
     required this.onShowColumnSettings,
     required this.onColumnWidthChanged,
+    this.onConfigSelected,
+    this.onConfigAll,
   });
 
   @override
@@ -69,6 +73,8 @@ class MainContent extends StatelessWidget {
           isMonitoring: isMonitoring,
           actionController: actionController,
           blinkingIps: blinkingIps,
+          onConfigSelected: onConfigSelected,
+          onConfigAll: onConfigAll,
         ),
         FilterToolbar(
           searchQuery: searchQuery,

@@ -4,12 +4,15 @@ import 'package:frontend/src/controllers/action_controller.dart';
 import 'package:frontend/src/controllers/dashboard_controller.dart';
 
 import 'package:frontend/src/rust/core/models.dart';
+import 'package:frontend/src/rust/api/commands.dart' show setMinerPowerMode;
 import 'package:frontend/src/services/column_service.dart';
 import 'package:frontend/src/widgets/column_settings_dialog.dart';
 import 'package:frontend/src/widgets/header_bar.dart';
 import 'package:frontend/src/widgets/main_content.dart';
 import 'package:frontend/src/widgets/sidebar.dart';
 import 'package:frontend/src/widgets/sidebar/ip_ranges_section.dart';
+import 'package:frontend/src/widgets/sidebar/pool_config_section.dart';
+import 'package:frontend/src/widgets/sidebar/power_control_section.dart';
 
 class DashboardShell extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -22,6 +25,8 @@ class DashboardShell extends StatefulWidget {
 
 class _DashboardShellState extends State<DashboardShell> {
   final _ipRangesSectionKey = GlobalKey<IpRangesSectionState>();
+  final _poolConfigSectionKey = GlobalKey<PoolConfigSectionState>();
+  final _powerControlSectionKey = GlobalKey<PowerControlSectionState>();
   late final DashboardController _controller;
   late final ActionController _actionController;
 
@@ -55,6 +60,54 @@ class _DashboardShellState extends State<DashboardShell> {
 
   Future<List<Miner>> _triggerScan() async {
     return await _ipRangesSectionKey.currentState?.scanSelectedRanges() ?? [];
+  }
+
+  void _configSelected() {
+    _runConfig(_controller.selectedMinerIps);
+  }
+
+  void _configAll() {
+    _runConfig(_controller.miners.map((m) => m.ip).toList());
+  }
+
+  Future<void> _runConfig(List<String> ips) async {
+    if (ips.isEmpty) {
+      _showToast('No miners to configure');
+      return;
+    }
+
+    final pools = _poolConfigSectionKey.currentState?.getEnabledPools();
+    final powerMode = _powerControlSectionKey.currentState?.getPowerMode();
+
+    if (pools == null && powerMode == null) {
+      _showToast('Nothing to apply — configure pools or power mode first');
+      return;
+    }
+
+    _showToast('Applying config to ${ips.length} miner(s)\u2026');
+
+    // Run all IPs concurrently
+    final results = await Future.wait(ips.map((ip) async {
+      final errors = <String>[];
+      if (pools != null) {
+        final r = await _actionController.setPoolsForIp(ip, pools);
+        if (!r.success) errors.add('pools: ${r.error}');
+      }
+      if (powerMode != null) {
+        final r = await setMinerPowerMode(ip: ip, sleep: powerMode);
+        if (!r.success) errors.add('power: ${r.error}');
+      }
+      return errors.isEmpty;
+    }));
+
+    final successCount = results.where((r) => r).length;
+    final failCount = results.length - successCount;
+
+    if (failCount == 0) {
+      _showToast('Config applied to $successCount miner(s). Miners will reboot.');
+    } else {
+      _showToast('Config: $successCount ok, $failCount failed. Check credentials.');
+    }
   }
 
   void _openColumnSettings() {
@@ -93,7 +146,7 @@ class _DashboardShellState extends State<DashboardShell> {
               Expanded(
                 child: Row(
                   children: [
-                    Sidebar(
+                     Sidebar(
                       isCollapsed: _controller.isSidebarCollapsed,
                       onScanStart: () => _controller.setScanning(true),
                       onScanComplete: (miners) {
@@ -102,6 +155,8 @@ class _DashboardShellState extends State<DashboardShell> {
                       },
                       onShowToast: _showToast,
                       ipRangesSectionKey: _ipRangesSectionKey,
+                      poolConfigSectionKey: _poolConfigSectionKey,
+                      powerControlSectionKey: _powerControlSectionKey,
                     ),
                     Expanded(
                       child: MainContent(
@@ -125,8 +180,10 @@ class _DashboardShellState extends State<DashboardShell> {
                         actionController: _actionController,
                         visibleColumns: _controller.columns,
                         blinkingIps: _controller.blinkingIps,
-                        onShowColumnSettings: _openColumnSettings,
+                       onShowColumnSettings: _openColumnSettings,
                         onColumnWidthChanged: _controller.updateColumnWidth,
+                        onConfigSelected: _configSelected,
+                        onConfigAll: _configAll,
                       ),
                     ),
                   ],

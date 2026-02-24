@@ -12,6 +12,8 @@ class Sidebar extends StatelessWidget {
   final Function(List<Miner>) onScanComplete;
   final Function(String) onShowToast;
   final GlobalKey<IpRangesSectionState>? ipRangesSectionKey;
+  final GlobalKey<PoolConfigSectionState>? poolConfigSectionKey;
+  final GlobalKey<PowerControlSectionState>? powerControlSectionKey;
 
   const Sidebar({
     super.key,
@@ -20,6 +22,8 @@ class Sidebar extends StatelessWidget {
     required this.onScanComplete,
     required this.onShowToast,
     this.ipRangesSectionKey,
+    this.poolConfigSectionKey,
+    this.powerControlSectionKey,
   });
 
   @override
@@ -55,11 +59,17 @@ class Sidebar extends StatelessWidget {
                   SizedBox(height: 12),
                   Divider(height: 1, thickness: 1),
                   SizedBox(height: 12),
-                  PoolConfigSection(onShowToast: onShowToast),
+                  PoolConfigSection(
+                    key: poolConfigSectionKey,
+                    onShowToast: onShowToast,
+                  ),
                   SizedBox(height: 12),
                   Divider(height: 1, thickness: 1),
                   SizedBox(height: 12),
-                  PowerControlSection(onShowToast: onShowToast),
+                  PowerControlSection(
+                    key: powerControlSectionKey,
+                    onShowToast: onShowToast,
+                  ),
                   SizedBox(height: 12),
                   Divider(height: 1, thickness: 1),
                   SizedBox(height: 12),
