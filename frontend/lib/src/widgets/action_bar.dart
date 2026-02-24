@@ -71,6 +71,7 @@ class ActionBar extends StatelessWidget {
             ),
           ),
           
+          /*
           // Monitor toggle
           ElevatedButton.icon(
             onPressed: actionController.toggleMonitor,
@@ -81,6 +82,7 @@ class ActionBar extends StatelessWidget {
               foregroundColor: isMonitoring ? Colors.white : null,
             ),
           ),
+          */
           
           // Vertical divider
           Container(

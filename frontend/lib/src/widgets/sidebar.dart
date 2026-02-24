@@ -71,9 +71,11 @@ class Sidebar extends StatelessWidget {
                     onShowToast: onShowToast,
                   ),
                   SizedBox(height: 12),
+                  /*
                   Divider(height: 1, thickness: 1),
                   SizedBox(height: 12),
                   OverclockSection(onShowToast: onShowToast),
+                  */
                 ],
               ),
             ),

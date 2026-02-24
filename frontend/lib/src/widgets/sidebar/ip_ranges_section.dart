@@ -339,6 +339,7 @@ class IpRangesSectionState extends State<IpRangesSection> {
                 ),
         ),
         
+        /*
         SizedBox(height: 8),
         
         // Only show successful checkbox
@@ -361,6 +362,7 @@ class IpRangesSectionState extends State<IpRangesSection> {
             ),
           ],
         ),
+        */
       ],
     );
   }
