@@ -29,13 +29,14 @@ This table defines the responsibility of each module in the codebase.
 | `backend/src/core/config.rs` | **Config** | `AppSettings` struct. Handles JSON persistence of credentials & scan settings. |
 | `backend/src/scanner/` | **Discovery** | Logic for `scan_range`. Manages thread pool & semaphores. |
 | `backend/src/monitor/` | **State** | The polling loop. Maintains `DashMap<IP, MinerStats>`. |
-| `backend/src/client/` | **Protocol** | `CGMinerClient` (TCP) & `WhatsminerWebClient` (HTTP). Handshakes, JSON parsing. |
+| `backend/src/client/` | **Protocol** | `CGMinerClient` (TCP), `WhatsminerWebClient` (LuCI HTTP) & `AntminerWebClient` (Digest HTTP). |
 | `backend/src/core/` | **Domain** | Shared types: `Miner`, `MinerStats`, `MinerStatus`, `MinerCredentials`. |
+| `backend/src/api/models.rs` | **FFI Types** | `MinerCommand` (exported as `@freezed` sealed class) and `PoolConfig`. |
 | `backend/src/utils.rs` | **Utils** | Shared utilities (e.g., JSON cleanup). |
 | **Frontend** | | |
 | `frontend/lib/src/rust/` | **Bridge** | Auto-generated FFI code (Do not edit manually). |
-| `frontend/lib/src/controllers/` | **State** | Logic & State Management (`ActionController`, `DashboardController`). |
-| `frontend/lib/src/widgets/` | **UI** | Reusable components (`MinerDataTable`, `DashboardShell`, `SettingsDialog`). |
+| `frontend/lib/src/controllers/` | **State** | Logic & State Management (`ActionController`, `DashboardController`). Handles concurrent batch operations. |
+| `frontend/lib/src/widgets/` | **UI** | Reusable components (`MinerDataTable`, `DashboardShell`). Uses `GlobalKey` for local state lifting (e.g., config sections). |
 | `frontend/lib/src/constants/` | **Config** | Shared constants (`ColumnConstants`). |
 | `frontend/lib/src/theme/` | **Style** | App implementation of design system. |
 
@@ -74,6 +75,10 @@ Logic for classifying device health:
 *   **Warning**: Performance degraded.
 *   **Offline**: Connection refused / Timeout.
 *   **Scanning**: Initial discovery phase.
+
+### 3.5 `MinerCommand` and `PoolConfig` (API Models)
+*   **`PoolConfig`**: FFI-safe struct containing `url`, `worker`, and `password`.
+*   **`MinerCommand`**: Enum (`Reboot`, `BlinkLed`, `StopBlink`, `SetPools { pools: Vec<PoolConfig> }`). Exposed to Dart via Flutter Rust Bridge as a `freezed` sealed class to support complex variants holding data.
 
 ---
 
@@ -135,12 +140,16 @@ These functions in `backend/src/api/` are the **only** entry points for the UI.
 6.  `stop_monitoring()`
 7.  `execute_command(ips: Vec<String>, cmd: MinerCommand, delay: u64, batch_size: usize)`
 8.  `detect_local_ranges() -> Vec<String>`
+9.  `set_miner_pools(ip: String, pools: Vec<PoolConfig>) -> CommandResult`
+10. `get_miner_pools(ip: String) -> Vec<PoolConfig>`
+11. `set_miner_power_mode(ip: String, sleep: bool) -> CommandResult`
 
 ---
 
 ## 6. Implementation Guidelines
 *   **No "Business Logic" in UI**: The Flutter side should be a dumb renderer. State decisions (e.g., "Is this miner overheated?") happen in Rust (`MinerStatus::from_stats`).
-*   **Error Handling**: Rust errors (`anyhow::Result`) are mapped to FFI enums so Flutter can show distinct toasts (NetworkError vs AuthError).
+*   **Frontend State Lifting**: Use `GlobalKey<SectionState>` in the `Sidebar` to expose localized form data (like Pool/Power configs) up to the `DashboardShell` without deeply coupling the UI components.
+*   **Error Handling**: Rust errors (`anyhow::Result`) are mapped to FFI enums so Flutter can show distinct toasts (NetworkError vs AuthError). Web clients (Antminer HTTP) implement "tolerant POSTs" to gracefully handle connection drops caused by immediate reboots on config changes.
 
 ---
 
