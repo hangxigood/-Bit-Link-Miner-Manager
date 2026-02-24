@@ -1,0 +1,43 @@
+name: Build Windows App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows you to trigger the build manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ''
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows desktop support
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: flutter pub get
+
+      - name: Build Windows release
+        working-directory: ./frontend
+        run: flutter build windows --release
+
+      - name: Upload Windows Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-App-Release
+          path: frontend/build/windows/x64/runner/Release/
+          retention-days: 7
