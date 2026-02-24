@@ -13,9 +13,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Setup Rust (MSVC toolchain)
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          toolchain: stable-x86_64-pc-windows-msvc
           rustflags: ''
 
       - name: Setup Flutter
