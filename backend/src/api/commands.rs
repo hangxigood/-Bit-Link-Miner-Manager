@@ -1,11 +1,15 @@
 use crate::api::models::{MinerCommand, CommandResult};
 
 use crate::core::MinerCredentials;
-use crate::client::{get_summary, whatsminer_web::WhatsminerWebClient};
+use crate::client::{
+    get_summary,
+    antminer_web::AntminerWebClient,
+    whatsminer_web::WhatsminerWebClient,
+};
 
 
-/// Execute a command on multiple miners
-/// Returns results for each IP (success/failure)
+/// Execute a command on multiple miners in parallel.
+/// Returns results for each IP (success/failure).
 pub async fn execute_batch_command(
     target_ips: Vec<String>,
     command: MinerCommand,
@@ -44,11 +48,16 @@ pub async fn execute_batch_command(
 use crate::api::settings::get_app_settings;
 use crate::core::config::AppSettings;
 
-/// Execute a command on a single miner
-async fn execute_single_command(ip: String, command: MinerCommand, antminer_creds: MinerCredentials, whatsminer_creds: MinerCredentials) -> CommandResult {
+/// Execute a command on a single miner.
+async fn execute_single_command(
+    ip: String,
+    command: MinerCommand,
+    antminer_creds: MinerCredentials,
+    whatsminer_creds: MinerCredentials,
+) -> CommandResult {
     println!("Executing command {:?} for {}...", command, ip);
     
-    // Detect miner type
+    // Detect miner type by querying CGMiner summary
     let is_whatsminer = if let Ok(stats) = get_summary(&ip, 4028, 500).await {
          let model = stats.model.as_ref().map(|m| m.to_lowercase()).unwrap_or_default();
          let firmware = stats.firmware.as_ref().map(|f| f.to_lowercase()).unwrap_or_default();
@@ -61,212 +70,187 @@ async fn execute_single_command(ip: String, command: MinerCommand, antminer_cred
 
     if is_whatsminer {
         println!("Detected Whatsminer for {}", ip);
-        match command {
-            MinerCommand::Reboot => {
-                match WhatsminerWebClient::reboot(&ip, &whatsminer_creds.username, &whatsminer_creds.password).await {
-                     Ok(_) => {
-                         println!("Whatsminer reboot SUCCESS for {}", ip);
-                         CommandResult { ip, success: true, error: None }
-                     },
-                     Err(e) => {
-                         println!("Whatsminer reboot FAILED for {}: {}", ip, e);
-                         CommandResult { ip, success: false, error: Some(e.to_string()) }
-                     },
+        execute_whatsminer_command(ip, command, whatsminer_creds).await
+    } else {
+        println!("Detected Antminer for {}", ip);
+        execute_antminer_command(ip, command, antminer_creds).await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Antminer command dispatch
+// ---------------------------------------------------------------------------
+
+async fn execute_antminer_command(
+    ip: String,
+    command: MinerCommand,
+    creds: MinerCredentials,
+) -> CommandResult {
+    let (user, pass) = (creds.username.as_str(), creds.password.as_str());
+
+    match command {
+        MinerCommand::Reboot => {
+            match AntminerWebClient::reboot(&ip, user, pass).await {
+                Ok(_) => {
+                    println!("Antminer reboot SUCCESS for {}", ip);
+                    CommandResult { ip, success: true, error: None }
                 }
-            }
-            MinerCommand::BlinkLed => {
-                 match WhatsminerWebClient::blink_led(&ip, &whatsminer_creds.username, &whatsminer_creds.password, true).await {
-                     Ok(_) => CommandResult { ip, success: true, error: None },
-                     Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
-                }
-            }
-            MinerCommand::StopBlink => {
-                 match WhatsminerWebClient::blink_led(&ip, &whatsminer_creds.username, &whatsminer_creds.password, false).await {
-                     Ok(_) => CommandResult { ip, success: true, error: None },
-                     Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
+                Err(e) => {
+                    println!("Antminer reboot FAILED for {}: {}", ip, e);
+                    CommandResult { ip, success: false, error: Some(e.to_string()) }
                 }
             }
         }
-    } else {
-        // Default (Antminer) behavior
-        match command {
-            MinerCommand::Reboot => {
-                // Reboot uses the HTTP web interface with Digest Auth
-                match reboot_via_http(&ip, &antminer_creds.username, &antminer_creds.password).await {
-                    Ok(_) => CommandResult {
-                        ip,
-                        success: true,
-                        error: None,
-                    },
-                    Err(e) => CommandResult {
-                        ip,
-                        success: false,
-                        error: Some(e),
-                    },
-                }
+
+        MinerCommand::BlinkLed => {
+            match AntminerWebClient::set_led(&ip, user, pass, true).await {
+                Ok(_) => CommandResult { ip, success: true, error: None },
+                Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
             }
-            MinerCommand::BlinkLed => {
-                match blink_led_via_http(&ip, &antminer_creds.username, &antminer_creds.password, true).await {
-                    Ok(_) => CommandResult {
-                        ip,
-                        success: true,
-                        error: None,
-                    },
-                    Err(e) => CommandResult {
-                        ip,
-                        success: false,
-                        error: Some(e),
-                    },
-                }
+        }
+
+        MinerCommand::StopBlink => {
+            match AntminerWebClient::set_led(&ip, user, pass, false).await {
+                Ok(_) => CommandResult { ip, success: true, error: None },
+                Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
             }
-            MinerCommand::StopBlink => {
-                match blink_led_via_http(&ip, &antminer_creds.username, &antminer_creds.password, false).await {
-                    Ok(_) => CommandResult {
-                        ip,
-                        success: true,
-                        error: None,
-                    },
-                    Err(e) => CommandResult {
-                        ip,
-                        success: false,
-                        error: Some(e),
-                    },
+        }
+
+        MinerCommand::SetPools { pools } => {
+            use crate::client::antminer_web::AntminerPool;
+            let antminer_pools: Vec<AntminerPool> = pools
+                .into_iter()
+                .map(|p| AntminerPool { url: p.url, user: p.worker, pass: p.password })
+                .collect();
+            match AntminerWebClient::set_pools(&ip, user, pass, antminer_pools).await {
+                Ok(_) => {
+                    println!("Antminer set_pools SUCCESS for {} (will reboot automatically)", ip);
+                    CommandResult { ip, success: true, error: None }
+                }
+                Err(e) => {
+                    println!("Antminer set_pools FAILED for {}: {}", ip, e);
+                    CommandResult { ip, success: false, error: Some(e.to_string()) }
                 }
             }
         }
     }
 }
 
-/// Reboot a miner via its HTTP web interface using Digest Authentication.
-/// Antminer endpoint: GET /cgi-bin/reboot.cgi
-/// Auth: HTTP Digest (realm "antMiner Configuration")
-async fn reboot_via_http(ip: &str, username: &str, password: &str) -> std::result::Result<(), String> {
-    let url = format!("http://{}/cgi-bin/reboot.cgi", ip);
-    let client = reqwest::Client::new();
+// ---------------------------------------------------------------------------
+// Whatsminer command dispatch
+// ---------------------------------------------------------------------------
 
-    // Step 1: Send initial request to get the WWW-Authenticate challenge
-    let resp = client
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
+async fn execute_whatsminer_command(
+    ip: String,
+    command: MinerCommand,
+    creds: MinerCredentials,
+) -> CommandResult {
+    let (user, pass) = (creds.username.as_str(), creds.password.as_str());
 
-    if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
-        // If the miner doesn't challenge us (maybe no auth required?), check if it's a success
-        if resp.status().is_success() {
-            return Ok(());
+    match command {
+        MinerCommand::Reboot => {
+            match WhatsminerWebClient::reboot(&ip, user, pass).await {
+                Ok(_) => {
+                    println!("Whatsminer reboot SUCCESS for {}", ip);
+                    CommandResult { ip, success: true, error: None }
+                }
+                Err(e) => {
+                    println!("Whatsminer reboot FAILED for {}: {}", ip, e);
+                    CommandResult { ip, success: false, error: Some(e.to_string()) }
+                }
+            }
         }
-        return Err(format!("Unexpected status: {}", resp.status()));
-    }
 
-    // Step 2: Extract the WWW-Authenticate header
-    let www_auth = resp
-        .headers()
-        .get("www-authenticate")
-        .ok_or("Missing WWW-Authenticate header")?
-        .to_str()
-        .map_err(|e| format!("Invalid WWW-Authenticate header: {}", e))?
-        .to_string();
+        MinerCommand::BlinkLed => {
+            match WhatsminerWebClient::blink_led(&ip, user, pass, true).await {
+                Ok(_) => CommandResult { ip, success: true, error: None },
+                Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
+            }
+        }
 
-    // Step 3: Compute the Digest Auth response
-    let context = digest_auth::AuthContext::new(username, password, "/cgi-bin/reboot.cgi");
-    let mut prompt = digest_auth::parse(&www_auth)
-        .map_err(|e| format!("Failed to parse digest challenge: {:?}", e))?;
-    let answer = prompt
-        .respond(&context)
-        .map_err(|e| format!("Failed to compute digest response: {:?}", e))?;
+        MinerCommand::StopBlink => {
+            match WhatsminerWebClient::blink_led(&ip, user, pass, false).await {
+                Ok(_) => CommandResult { ip, success: true, error: None },
+                Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
+            }
+        }
 
-    // Step 4: Send the authenticated request
-    let auth_header = answer.to_header_string();
-    let resp = client
-        .get(&url)
-        .header("Authorization", auth_header)
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .map_err(|e| format!("Authenticated request failed: {}", e))?;
-
-    if resp.status().is_success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "Reboot request failed with status: {} (check credentials)",
-            resp.status()
-        ))
-    }
-}
-
-/// Blink LED via HTTP (POST /cgi-bin/blink.cgi)
-/// state: true for blink, false for stop
-async fn blink_led_via_http(ip: &str, username: &str, password: &str, state: bool) -> std::result::Result<(), String> {
-    let url = format!("http://{}/cgi-bin/blink.cgi", ip);
-    let client = reqwest::Client::new();
-    // Payload MUST be exactly `{"blink": true}` or `{"blink": false}`
-    let payload = format!(r#"{{"blink": {}}}"#, state);
-
-    // Step 1: Send initial request (likely to fail with 401, but might work)
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "text/plain;charset=UTF-8")
-        .header("X-Requested-With", "XMLHttpRequest")
-        .header("Referer", format!("http://{}/", ip))
-        .body(payload.clone())
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-    if resp.status().is_success() {
-        return Ok(());
-    }
-
-    if resp.status() != reqwest::StatusCode::UNAUTHORIZED {
-        return Err(format!("Unexpected status: {}", resp.status()));
-    }
-
-    // Step 2: Extract WWW-Authenticate header
-    let www_auth = resp
-        .headers()
-        .get("www-authenticate")
-        .ok_or("Missing WWW-Authenticate header")?
-        .to_str()
-        .map_err(|e| format!("Invalid WWW-Authenticate header: {}", e))?
-        .to_string();
-
-    // Step 3: Compute Digest Auth
-    let mut context = digest_auth::AuthContext::new(username, password, "/cgi-bin/blink.cgi");
-    // Set method to POST (default is GET)
-    context.method = digest_auth::HttpMethod::POST;
-
-    let mut prompt = digest_auth::parse(&www_auth)
-        .map_err(|e| format!("Failed to parse digest challenge: {:?}", e))?;
-    let answer = prompt
-        .respond(&context) // digest_auth 0.3 uses context method
-        .map_err(|e| format!("Failed to compute digest response: {:?}", e))?;
-
-    // Step 4: Send authenticated request
-    let auth_header = answer.to_header_string();
-    let resp = client
-        .post(&url)
-        .header("Authorization", auth_header)
-        .header("Content-Type", "text/plain;charset=UTF-8")
-        .header("X-Requested-With", "XMLHttpRequest")
-        .header("Referer", format!("http://{}/", ip))
-        .body(payload.clone())
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .map_err(|e| format!("Authenticated request failed: {}", e))?;
-
-    if resp.status().is_success() {
-        Ok(())
-    } else {
-        Err(format!("Blink request failed with status: {}", resp.status()))
+        MinerCommand::SetPools { .. } => {
+            // Whatsminer pool configuration uses the CGMiner TCP API (addpool/removepool)
+            // which is already handled by the existing pool management in the monitoring loop.
+            // Direct HTTP pool-set is not implemented for Whatsminer yet.
+            CommandResult {
+                ip,
+                success: false,
+                error: Some("SetPools not yet implemented for Whatsminer via HTTP API".to_string()),
+            }
+        }
     }
 }
 
 /// Test connection to a single miner
 pub fn test_connection(ip: String) -> String {
     format!("Testing connection to {}", ip)
+}
+
+/// Set mining pools on a single Antminer via its HTTP API.
+/// Reads the current config first to preserve fan/frequency settings.
+/// The miner will automatically reboot ~2 minutes after applying the change.
+///
+/// `pools` must have 1–3 entries.
+pub async fn set_miner_pools(ip: String, pools: Vec<crate::api::models::PoolConfig>) -> CommandResult {
+    use crate::client::antminer_web::{AntminerWebClient, AntminerPool};
+    let settings = AppSettings::load();
+    let creds = settings.antminer_credentials;
+
+    let antminer_pools: Vec<AntminerPool> = pools
+        .into_iter()
+        .map(|p| AntminerPool { url: p.url, user: p.worker, pass: p.password })
+        .collect();
+
+    match AntminerWebClient::set_pools(&ip, &creds.username, &creds.password, antminer_pools).await {
+        Ok(_) => CommandResult { ip, success: true, error: None },
+        Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
+    }
+}
+
+/// Read the currently configured pools from a single Antminer.
+pub async fn get_miner_pools(ip: String) -> Vec<crate::api::models::PoolConfig> {
+    use crate::client::antminer_web::AntminerWebClient;
+    let settings = AppSettings::load();
+    let creds = settings.antminer_credentials;
+
+    match AntminerWebClient::get_pools(&ip, &creds.username, &creds.password).await {
+        Ok(pools) => pools
+            .into_iter()
+            .map(|p| crate::api::models::PoolConfig { url: p.url, worker: p.user, password: p.pass })
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Set the power mode on a single Antminer via its HTTP API.
+/// - `sleep = true`  → Low Power Mode (LPM) — miner reduces hashrate to save power
+/// - `sleep = false` → Normal mode — miner resumes full operation
+///
+/// The miner will automatically reboot after applying the change.
+pub async fn set_miner_power_mode(ip: String, sleep: bool) -> CommandResult {
+    use crate::client::antminer_web::AntminerWebClient;
+    let settings = AppSettings::load();
+    let creds = settings.antminer_credentials;
+
+    match AntminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, sleep).await {
+        Ok(_) => {
+            println!(
+                "Antminer set_power_mode({}) SUCCESS for {} (will reboot automatically)",
+                if sleep { "sleep" } else { "normal" },
+                ip
+            );
+            CommandResult { ip, success: true, error: None }
+        }
+        Err(e) => {
+            println!("Antminer set_power_mode FAILED for {}: {}", ip, e);
+            CommandResult { ip, success: false, error: Some(e.to_string()) }
+        }
+    }
 }
