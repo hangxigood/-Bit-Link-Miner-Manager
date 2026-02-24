@@ -7,6 +7,7 @@ use tokio::time::{timeout, timeout_at};
 
 pub mod parsers;
 pub mod whatsminer_web;
+pub mod antminer_web;
 use parsers::{MinerParser, AntminerParser, WhatsminerParser};
 
 /// Default CGMiner API port
