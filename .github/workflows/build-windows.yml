@@ -12,6 +12,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Enable symlink support so git restores frontend/rust as a real symlink
+          # Requires the runner to have developer mode or SeCreateSymbolicLinkPrivilege
+          # On GitHub-hosted runners this is available
+          # symlinks: true  # This doesn't work on Windows easily, so we use a junction instead
+
+      - name: Create frontend/rust junction (Windows symlink equivalent)
+        # Cargokit resolves Cargo.toml via frontend/rust -> ../backend
+        # On macOS this is a real symlink; on Windows we create a directory junction instead
+        run: |
+          $target = Resolve-Path "$env:GITHUB_WORKSPACE\backend"
+          $link = "$env:GITHUB_WORKSPACE\frontend\rust"
+          if (Test-Path $link) { Remove-Item $link -Recurse -Force }
+          cmd /c mklink /J "$link" "$target"
+          Write-Host "Created junction: $link -> $target"
 
       - name: Setup Rust (MSVC toolchain)
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -32,14 +47,9 @@ jobs:
         working-directory: ./frontend
         run: flutter pub get
 
-      # Explicit cargo build step to surface real Rust errors (not buried in MSBuild output)
-      - name: Build Rust backend (cargo)
-        working-directory: ./backend
-        run: cargo build --release --target x86_64-pc-windows-msvc
-
       - name: Build Windows release
         working-directory: ./frontend
-        run: flutter build windows --release --verbose
+        run: flutter build windows --release
 
       - name: Upload Windows Build Artifact
         uses: actions/upload-artifact@v4
