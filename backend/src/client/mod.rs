@@ -235,6 +235,19 @@ pub(crate) async fn lookup_mac_address(ip: &str) -> Option<String> {
                 return None;
             }
         }
+    } else if cfg!(target_os = "windows") {
+        // Windows: `arp -a <ip>` ships with every Windows installation
+        match tokio::process::Command::new("arp")
+            .arg("-a")
+            .arg(ip)
+            .output()
+            .await {
+            Ok(o) => o,
+            Err(e) => {
+                eprintln!("[MAC] Failed to execute 'arp -a' command for {}: {}", ip, e);
+                return None;
+            }
+        }
     } else {
         // Linux
         match tokio::process::Command::new("ip")
