@@ -175,14 +175,21 @@ async fn execute_whatsminer_command(
             }
         }
 
-        MinerCommand::SetPools { .. } => {
-            // Whatsminer pool configuration uses the CGMiner TCP API (addpool/removepool)
-            // which is already handled by the existing pool management in the monitoring loop.
-            // Direct HTTP pool-set is not implemented for Whatsminer yet.
-            CommandResult {
-                ip,
-                success: false,
-                error: Some("SetPools not yet implemented for Whatsminer via HTTP API".to_string()),
+        MinerCommand::SetPools { pools } => {
+            use crate::client::whatsminer_web::WhatsminerPool;
+            let wm_pools: Vec<WhatsminerPool> = pools
+                .into_iter()
+                .map(|p| WhatsminerPool { url: p.url, worker: p.worker, password: p.password })
+                .collect();
+            match WhatsminerWebClient::set_pools(&ip, user, pass, wm_pools).await {
+                Ok(_) => {
+                    println!("Whatsminer set_pools SUCCESS for {} (daemon restarted)", ip);
+                    CommandResult { ip, success: true, error: None }
+                }
+                Err(e) => {
+                    println!("Whatsminer set_pools FAILED for {}: {}", ip, e);
+                    CommandResult { ip, success: false, error: Some(e.to_string()) }
+                }
             }
         }
     }
@@ -229,28 +236,52 @@ pub async fn get_miner_pools(ip: String) -> Vec<crate::api::models::PoolConfig> 
     }
 }
 
-/// Set the power mode on a single Antminer via its HTTP API.
-/// - `sleep = true`  → Low Power Mode (LPM) — miner reduces hashrate to save power
-/// - `sleep = false` → Normal mode — miner resumes full operation
-///
-/// The miner will automatically reboot after applying the change.
+/// Set the power mode on a miner. Detects Whatsminer vs Antminer automatically.
+/// - `sleep = true`  → Low Power Mode
+/// - `sleep = false` → Normal mode
 pub async fn set_miner_power_mode(ip: String, sleep: bool) -> CommandResult {
     use crate::client::antminer_web::AntminerWebClient;
+    use crate::client::whatsminer_web::WhatsminerWebClient;
     let settings = AppSettings::load();
-    let creds = settings.antminer_credentials;
 
-    match AntminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, sleep).await {
-        Ok(_) => {
-            println!(
-                "Antminer set_power_mode({}) SUCCESS for {} (will reboot automatically)",
-                if sleep { "sleep" } else { "normal" },
-                ip
-            );
-            CommandResult { ip, success: true, error: None }
+    // Detect miner type via CGMiner summary (same logic as execute_single_command)
+    let is_whatsminer = if let Ok(stats) = crate::client::get_summary(&ip, 4028, 500).await {
+        let model = stats.model.as_ref().map(|m| m.to_lowercase()).unwrap_or_default();
+        let firmware = stats.firmware.as_ref().map(|f| f.to_lowercase()).unwrap_or_default();
+        model.contains("whatsminer") || firmware.contains("whatsminer")
+    } else {
+        false
+    };
+
+    if is_whatsminer {
+        let creds = settings.whatsminer_credentials;
+        // Map sleep flag to Whatsminer LuCI `miner_type` field value
+        let mode = if sleep { "Low" } else { "Normal" };
+        match WhatsminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, mode).await {
+            Ok(_) => {
+                println!("Whatsminer set_power_mode({}) SUCCESS for {}", mode, ip);
+                CommandResult { ip, success: true, error: None }
+            }
+            Err(e) => {
+                println!("Whatsminer set_power_mode FAILED for {}: {}", ip, e);
+                CommandResult { ip, success: false, error: Some(e.to_string()) }
+            }
         }
-        Err(e) => {
-            println!("Antminer set_power_mode FAILED for {}: {}", ip, e);
-            CommandResult { ip, success: false, error: Some(e.to_string()) }
+    } else {
+        let creds = settings.antminer_credentials;
+        match AntminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, sleep).await {
+            Ok(_) => {
+                println!(
+                    "Antminer set_power_mode({}) SUCCESS for {} (will reboot automatically)",
+                    if sleep { "sleep" } else { "normal" }, ip
+                );
+                CommandResult { ip, success: true, error: None }
+            }
+            Err(e) => {
+                println!("Antminer set_power_mode FAILED for {}: {}", ip, e);
+                CommandResult { ip, success: false, error: Some(e.to_string()) }
+            }
         }
     }
 }
+
