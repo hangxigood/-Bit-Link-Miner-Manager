@@ -12,11 +12,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          # Enable symlink support so git restores frontend/rust as a real symlink
-          # Requires the runner to have developer mode or SeCreateSymbolicLinkPrivilege
-          # On GitHub-hosted runners this is available
-          # symlinks: true  # This doesn't work on Windows easily, so we use a junction instead
 
       - name: Create frontend/rust junction (Windows symlink equivalent)
         # Cargokit resolves Cargo.toml via frontend/rust -> ../backend
