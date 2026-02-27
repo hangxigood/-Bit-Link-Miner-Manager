@@ -237,11 +237,17 @@ pub(crate) async fn lookup_mac_address(ip: &str) -> Option<String> {
         }
     } else if cfg!(target_os = "windows") {
         // Windows: `arp -a <ip>` ships with every Windows installation
-        match tokio::process::Command::new("arp")
-            .arg("-a")
-            .arg(ip)
-            .output()
-            .await {
+        // CREATE_NO_WINDOW (0x08000000) prevents a console window from flashing
+        // for each subprocess spawned during concurrent scanning.
+        #[allow(unused_mut)]
+        let mut cmd = tokio::process::Command::new("arp");
+        cmd.arg("-a").arg(ip);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+        match cmd.output().await {
             Ok(o) => o,
             Err(e) => {
                 eprintln!("[MAC] Failed to execute 'arp -a' command for {}: {}", ip, e);
