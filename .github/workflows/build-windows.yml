@@ -46,9 +46,15 @@ jobs:
         working-directory: ./frontend
         run: flutter build windows --release
 
-      - name: Upload Windows Build Artifact
+      - name: Download VC++ Redistributable
+        run: curl -L "https://aka.ms/vs/17/release/vc_redist.x64.exe" -o VC_redist.x64.exe
+
+      - name: Create Installer using Inno Setup
+        run: iscc windows_setup.iss
+
+      - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-App-Release
-          path: frontend/build/windows/x64/runner/Release/
+          name: BitLinkManager_Setup
+          path: Output/BitLinkManager_Setup.exe
           retention-days: 7
