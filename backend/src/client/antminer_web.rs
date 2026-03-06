@@ -26,7 +26,7 @@ pub struct AntminerPool {
 ///
 /// Key observations from real device (Antminer, firmware 2024):
 ///   - Power mode is stored as **`"bitmain-work-mode"`** with a **string** value:
-///       "0" = Normal, "1" = Sleep, "2" = Low Power Mode (LPM)
+///       "0" = Normal, "1" = Sleep, "3" = Low Power Mode (LPM)
 ///   - `"freq-level"` is actually `"bitmain-freq-level"` on real firmware.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MinerConf {
@@ -39,7 +39,7 @@ struct MinerConf {
     #[serde(rename = "bitmain-fan-pwm", default = "default_fan_pwm")]
     pub fan_pwm: String,
 
-    /// Power-mode string: "0"=Normal, "1"=Sleep, "2"=LPM.
+    /// Power-mode string: "0"=Normal, "1"=Sleep, "3"=LPM.
     /// Stored as String to survive verbatim round-trip through set_miner_conf.cgi.
     #[serde(rename = "bitmain-work-mode", default = "default_work_mode")]
     pub work_mode: String,
@@ -309,7 +309,7 @@ impl AntminerWebClient {
     /// mode, we must send `"miner-mode"`. So we remove the GET key and
     /// insert the POST key.
     ///
-    /// Mode values: 0 = Normal, 1 = Sleep, 2 = LPM
+    /// Mode values: 0 = Normal, 1 = Sleep, 3 = LPM
     ///
     /// Triggers an automatic reboot.
     pub async fn set_power_mode(ip: &str, username: &str, password: &str, mode: u8) -> Result<()> {
@@ -331,7 +331,7 @@ impl AntminerWebClient {
     }
 
     /// Read the current power mode without changing anything.
-    /// Returns the raw work-mode u8 value (0=Normal, 1=Sleep, 2=LPM).
+    /// Returns the raw work-mode u8 value (0=Normal, 1=Sleep, 3=LPM).
     pub async fn read_power_mode(ip: &str, username: &str, password: &str) -> Result<u8> {
         let raw = Self::digest_get(ip, "/cgi-bin/get_miner_conf.cgi", username, password).await?;
         let conf: serde_json::Value = serde_json::from_str(raw.trim())

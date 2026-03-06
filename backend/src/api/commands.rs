@@ -229,7 +229,7 @@ pub async fn get_miner_pools(ip: String) -> Vec<crate::api::models::PoolConfig> 
 /// Set the power mode on a miner. Detects Whatsminer vs Antminer automatically.
 ///
 /// PowerMode mapping:
-///   Antminer  — Normal=0, Sleep=1, Lpm=2 (via `miner-mode` field in set_miner_conf.cgi)
+///   Antminer  — Normal=0, Sleep=1, Lpm=3 (via `miner-mode` field in set_miner_conf.cgi)
 ///   Whatsminer — Normal="Normal", Lpm="Low", Sleep="Low" (no dedicated sleep, falls back to Low)
 pub async fn set_miner_power_mode(ip: String, mode: crate::api::models::PowerMode) -> CommandResult {
     use crate::client::antminer_web::AntminerWebClient;
@@ -269,7 +269,7 @@ pub async fn set_miner_power_mode(ip: String, mode: crate::api::models::PowerMod
         let mode_u8: u8 = match mode {
             PowerMode::Normal => 0,
             PowerMode::Sleep  => 1,
-            PowerMode::Lpm    => 2,
+            PowerMode::Lpm    => 3,
         };
         match AntminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, mode_u8).await {
             Ok(_) => {

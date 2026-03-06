@@ -598,7 +598,7 @@ class _MinerDataTableState extends State<MinerDataTable> {
         color = context.error;
         label = 'Sleep';
         break;
-      case 2:
+      case 3:
         color = context.warning;
         label = 'LPM';
         break;

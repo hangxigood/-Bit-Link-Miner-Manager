@@ -43,7 +43,7 @@ Future<List<PoolConfig>> getMinerPools({required String ip}) =>
 /// Set the power mode on a miner. Detects Whatsminer vs Antminer automatically.
 ///
 /// PowerMode mapping:
-///   Antminer  — Normal=0, Sleep=1, Lpm=2 (via `miner-mode` field in set_miner_conf.cgi)
+///   Antminer  — Normal=0, Sleep=1, Lpm=3 (via `miner-mode` field in set_miner_conf.cgi)
 ///   Whatsminer — Normal="Normal", Lpm="Low", Sleep="Low" (no dedicated sleep, falls back to Low)
 Future<CommandResult> setMinerPowerMode({
   required String ip,

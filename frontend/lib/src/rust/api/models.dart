@@ -73,7 +73,7 @@ class PoolConfig {
 /// Antminer miner-mode values (field `miner-mode` in `set_miner_conf.cgi`):
 ///   - Normal → 0
 ///   - Sleep  → 1   (miner stops hashing, stays reachable)
-///   - Lpm    → 2   (Low Power Mode — reduced hashrate; not all firmware supports this)
+///   - Lpm    → 3   (Low Power Mode — reduced hashrate; not all firmware supports this)
 ///
 /// Whatsminer (LuCI `miner_type` field):
 ///   - Normal → "Normal"
