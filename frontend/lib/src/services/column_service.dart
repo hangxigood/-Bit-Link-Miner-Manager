@@ -5,7 +5,7 @@ import 'package:frontend/src/models/data_column_config.dart';
 import 'package:frontend/src/constants/column_constants.dart';
 
 class ColumnService {
-  static const String _prefsKey = 'miner_table_columns_v5';
+  static const String _prefsKey = 'miner_table_columns_v6';
 
   Future<List<DataColumnConfig>> loadColumnSettings() async {
     try {
@@ -53,6 +53,7 @@ class ColumnService {
       DataColumnConfig(id: ColumnConstants.idStatus, label: 'Status', visible: true, width: ColumnConstants.widthStatus),
       DataColumnConfig(id: ColumnConstants.idLocate, label: 'Locate', visible: true, width: ColumnConstants.widthLocate),
       DataColumnConfig(id: ColumnConstants.idModel, label: 'Model', visible: true, width: ColumnConstants.widthModel),
+      DataColumnConfig(id: ColumnConstants.idPowerMode, label: 'Pwr Mode', visible: true, width: 110.0),
       DataColumnConfig(id: ColumnConstants.idHashrateRt, label: 'Hashrate', visible: true, width: ColumnConstants.widthHashrate),
       DataColumnConfig(id: ColumnConstants.idHashrateAvg, label: 'Avg Hash', visible: false, width: ColumnConstants.widthHashrate),
       DataColumnConfig(id: ColumnConstants.idTempIn0, label: 'InT-0', visible: true, width: ColumnConstants.widthTemp),

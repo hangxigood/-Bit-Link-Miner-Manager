@@ -90,6 +90,7 @@ impl MinerResponseParser for WhatsminerParser {
             software: None, // Could be "Description" from status?
             hardware: None,
             mac_address: None, // Will be fetched
+            power_mode: None,  // Whatsminer doesn't expose miner-mode via CGMiner API
         })
     }
 

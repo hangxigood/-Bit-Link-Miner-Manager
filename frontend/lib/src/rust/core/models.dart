@@ -6,88 +6,141 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+/// Represents a discovered miner on the network
+class Miner {
+  final String ip;
+  final String? model;
+  final MinerStatus status;
+  final MinerStats stats;
+  final BigInt lastUpdated;
 
-            
+  const Miner({
+    required this.ip,
+    this.model,
+    required this.status,
+    required this.stats,
+    required this.lastUpdated,
+  });
 
-            
+  @override
+  int get hashCode =>
+      ip.hashCode ^
+      model.hashCode ^
+      status.hashCode ^
+      stats.hashCode ^
+      lastUpdated.hashCode;
 
-            /// Represents a discovered miner on the network
-class Miner  {
-                final String ip;
-final String? model;
-final MinerStatus status;
-final MinerStats stats;
-final BigInt lastUpdated;
-
-                const Miner({required this.ip ,this.model ,required this.status ,required this.stats ,required this.lastUpdated ,});
-
-                
-                
-
-                
-        @override
-        int get hashCode => ip.hashCode^model.hashCode^status.hashCode^stats.hashCode^lastUpdated.hashCode;
-        
-
-                
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is Miner &&
-                runtimeType == other.runtimeType
-                && ip == other.ip&& model == other.model&& status == other.status&& stats == other.stats&& lastUpdated == other.lastUpdated;
-        
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Miner &&
+          runtimeType == other.runtimeType &&
+          ip == other.ip &&
+          model == other.model &&
+          status == other.status &&
+          stats == other.stats &&
+          lastUpdated == other.lastUpdated;
+}
 
 /// Performance metrics for a miner
-class MinerStats  {
-                final double hashrateRt;
-final double hashrateAvg;
-final List<double?> tempOutletMin;
-final List<double?> tempOutletMax;
-final List<double?> tempInletMin;
-final List<double?> tempInletMax;
-final List<int?> fanSpeeds;
-final BigInt uptime;
-final String? pool1;
-final String? worker1;
-final String? pool2;
-final String? worker2;
-final String? pool3;
-final String? worker3;
-final String? model;
-final String? firmware;
-final String? software;
-final String? hardware;
-final String? macAddress;
+class MinerStats {
+  final double hashrateRt;
+  final double hashrateAvg;
+  final List<double?> tempOutletMin;
+  final List<double?> tempOutletMax;
+  final List<double?> tempInletMin;
+  final List<double?> tempInletMax;
+  final List<int?> fanSpeeds;
+  final BigInt uptime;
+  final String? pool1;
+  final String? worker1;
+  final String? pool2;
+  final String? worker2;
+  final String? pool3;
+  final String? worker3;
+  final String? model;
+  final String? firmware;
+  final String? software;
+  final String? hardware;
+  final String? macAddress;
 
-                const MinerStats({required this.hashrateRt ,required this.hashrateAvg ,required this.tempOutletMin ,required this.tempOutletMax ,required this.tempInletMin ,required this.tempInletMax ,required this.fanSpeeds ,required this.uptime ,this.pool1 ,this.worker1 ,this.pool2 ,this.worker2 ,this.pool3 ,this.worker3 ,this.model ,this.firmware ,this.software ,this.hardware ,this.macAddress ,});
+  /// Current power mode as raw Antminer `miner-mode` value:
+  ///   0 = Normal, 1 = Sleep, 2 = LPM
+  /// `None` if not yet read or unsupported.
+  final int? powerMode;
 
-                
-                
+  const MinerStats({
+    required this.hashrateRt,
+    required this.hashrateAvg,
+    required this.tempOutletMin,
+    required this.tempOutletMax,
+    required this.tempInletMin,
+    required this.tempInletMax,
+    required this.fanSpeeds,
+    required this.uptime,
+    this.pool1,
+    this.worker1,
+    this.pool2,
+    this.worker2,
+    this.pool3,
+    this.worker3,
+    this.model,
+    this.firmware,
+    this.software,
+    this.hardware,
+    this.macAddress,
+    this.powerMode,
+  });
 
-                
-        @override
-        int get hashCode => hashrateRt.hashCode^hashrateAvg.hashCode^tempOutletMin.hashCode^tempOutletMax.hashCode^tempInletMin.hashCode^tempInletMax.hashCode^fanSpeeds.hashCode^uptime.hashCode^pool1.hashCode^worker1.hashCode^pool2.hashCode^worker2.hashCode^pool3.hashCode^worker3.hashCode^model.hashCode^firmware.hashCode^software.hashCode^hardware.hashCode^macAddress.hashCode;
-        
+  @override
+  int get hashCode =>
+      hashrateRt.hashCode ^
+      hashrateAvg.hashCode ^
+      tempOutletMin.hashCode ^
+      tempOutletMax.hashCode ^
+      tempInletMin.hashCode ^
+      tempInletMax.hashCode ^
+      fanSpeeds.hashCode ^
+      uptime.hashCode ^
+      pool1.hashCode ^
+      worker1.hashCode ^
+      pool2.hashCode ^
+      worker2.hashCode ^
+      pool3.hashCode ^
+      worker3.hashCode ^
+      model.hashCode ^
+      firmware.hashCode ^
+      software.hashCode ^
+      hardware.hashCode ^
+      macAddress.hashCode ^
+      powerMode.hashCode;
 
-                
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is MinerStats &&
-                runtimeType == other.runtimeType
-                && hashrateRt == other.hashrateRt&& hashrateAvg == other.hashrateAvg&& tempOutletMin == other.tempOutletMin&& tempOutletMax == other.tempOutletMax&& tempInletMin == other.tempInletMin&& tempInletMax == other.tempInletMax&& fanSpeeds == other.fanSpeeds&& uptime == other.uptime&& pool1 == other.pool1&& worker1 == other.worker1&& pool2 == other.pool2&& worker2 == other.worker2&& pool3 == other.pool3&& worker3 == other.worker3&& model == other.model&& firmware == other.firmware&& software == other.software&& hardware == other.hardware&& macAddress == other.macAddress;
-        
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MinerStats &&
+          runtimeType == other.runtimeType &&
+          hashrateRt == other.hashrateRt &&
+          hashrateAvg == other.hashrateAvg &&
+          tempOutletMin == other.tempOutletMin &&
+          tempOutletMax == other.tempOutletMax &&
+          tempInletMin == other.tempInletMin &&
+          tempInletMax == other.tempInletMax &&
+          fanSpeeds == other.fanSpeeds &&
+          uptime == other.uptime &&
+          pool1 == other.pool1 &&
+          worker1 == other.worker1 &&
+          pool2 == other.pool2 &&
+          worker2 == other.worker2 &&
+          pool3 == other.pool3 &&
+          worker3 == other.worker3 &&
+          model == other.model &&
+          firmware == other.firmware &&
+          software == other.software &&
+          hardware == other.hardware &&
+          macAddress == other.macAddress &&
+          powerMode == other.powerMode;
+}
 
 /// Status of a miner
-enum MinerStatus {
-                    active,
-warning,
-dead,
-scanning,
-                    ;
-                    
-                }
-            
+enum MinerStatus { active, warning, dead, scanning }

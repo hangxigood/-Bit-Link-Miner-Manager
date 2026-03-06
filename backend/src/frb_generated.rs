@@ -336,7 +336,8 @@ let mut var_firmware = <Option<String>>::sse_decode(deserializer);
 let mut var_software = <Option<String>>::sse_decode(deserializer);
 let mut var_hardware = <Option<String>>::sse_decode(deserializer);
 let mut var_macAddress = <Option<String>>::sse_decode(deserializer);
-return crate::core::models::MinerStats{hashrate_rt: var_hashrateRt, hashrate_avg: var_hashrateAvg, temp_outlet_min: var_tempOutletMin, temp_outlet_max: var_tempOutletMax, temp_inlet_min: var_tempInletMin, temp_inlet_max: var_tempInletMax, fan_speeds: var_fanSpeeds, uptime: var_uptime, pool1: var_pool1, worker1: var_worker1, pool2: var_pool2, worker2: var_worker2, pool3: var_pool3, worker3: var_worker3, model: var_model, firmware: var_firmware, software: var_software, hardware: var_hardware, mac_address: var_macAddress};}
+let mut var_powerMode = <Option<u8>>::sse_decode(deserializer);
+return crate::core::models::MinerStats{hashrate_rt: var_hashrateRt, hashrate_avg: var_hashrateAvg, temp_outlet_min: var_tempOutletMin, temp_outlet_max: var_tempOutletMax, temp_inlet_min: var_tempInletMin, temp_inlet_max: var_tempInletMax, fan_speeds: var_fanSpeeds, uptime: var_uptime, pool1: var_pool1, worker1: var_worker1, pool2: var_pool2, worker2: var_worker2, pool3: var_pool3, worker3: var_worker3, model: var_model, firmware: var_firmware, software: var_software, hardware: var_hardware, mac_address: var_macAddress, power_mode: var_powerMode};}
                 }
                 
                 impl SseDecode for crate::core::models::MinerStatus {
@@ -382,6 +383,15 @@ return crate::core::models::MinerStats{hashrate_rt: var_hashrateRt, hashrate_avg
                     // Codec=Sse (Serialization based), see doc to use other codecs
                     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {if (<bool>::sse_decode(deserializer)) {
                 return Some(<u32>::sse_decode(deserializer));
+            } else {
+                return None;
+            }}
+                }
+                
+                impl SseDecode for Option<u8> {
+                    // Codec=Sse (Serialization based), see doc to use other codecs
+                    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {if (<bool>::sse_decode(deserializer)) {
+                return Some(<u8>::sse_decode(deserializer));
             } else {
                 return None;
             }}
@@ -573,7 +583,8 @@ self.model.into_into_dart().into_dart(),
 self.firmware.into_into_dart().into_dart(),
 self.software.into_into_dart().into_dart(),
 self.hardware.into_into_dart().into_dart(),
-self.mac_address.into_into_dart().into_dart()
+self.mac_address.into_into_dart().into_dart(),
+self.power_mode.into_into_dart().into_dart()
                 ].into_dart()
                 }
             }
@@ -762,7 +773,8 @@ crate::api::models::MinerCommand::SetPools{pools} => { <i32>::sse_encode(3, seri
 <Option<String>>::sse_encode(self.firmware, serializer);
 <Option<String>>::sse_encode(self.software, serializer);
 <Option<String>>::sse_encode(self.hardware, serializer);
-<Option<String>>::sse_encode(self.mac_address, serializer);}
+<Option<String>>::sse_encode(self.mac_address, serializer);
+<Option<u8>>::sse_encode(self.power_mode, serializer);}
                 }
                 
                 impl SseEncode for crate::core::models::MinerStatus {
@@ -803,6 +815,14 @@ crate::core::models::MinerStatus::Scanning => { 3 }
                     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<bool>::sse_encode(self.is_some(), serializer);
                 if let Some(value) = self {
                     <u32>::sse_encode(value, serializer);
+                }}
+                }
+                
+                impl SseEncode for Option<u8> {
+                    // Codec=Sse (Serialization based), see doc to use other codecs
+                    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {<bool>::sse_encode(self.is_some(), serializer);
+                if let Some(value) = self {
+                    <u8>::sse_encode(value, serializer);
                 }}
                 }
                 

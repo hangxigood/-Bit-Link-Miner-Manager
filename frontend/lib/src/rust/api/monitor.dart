@@ -7,21 +7,19 @@ import '../core/models.dart';
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-
-            // These functions are ignored because they are not marked as `pub`: `update_miners_loop`
+// These functions are ignored because they are not marked as `pub`: `update_miners_loop`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CURRENT_MINERS`, `MONITOR_RX`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`, `deref`, `initialize`, `initialize`
 
-
-            /// Start monitoring a list of miners
+/// Start monitoring a list of miners
 /// This initializes the background polling loop
-Future<void>  startMonitoring({required List<Miner> miners }) => RustLib.instance.api.crateApiMonitorStartMonitoring(miners: miners);
+Future<void> startMonitoring({required List<Miner> miners}) =>
+    RustLib.instance.api.crateApiMonitorStartMonitoring(miners: miners);
 
 /// Get current snapshot of all monitored miners
-Future<List<Miner>>  getCurrentMiners() => RustLib.instance.api.crateApiMonitorGetCurrentMiners();
+Future<List<Miner>> getCurrentMiners() =>
+    RustLib.instance.api.crateApiMonitorGetCurrentMiners();
 
 /// Stop the monitor
-Future<void>  stopMonitoring() => RustLib.instance.api.crateApiMonitorStopMonitoring();
-
-            
-            
+Future<void> stopMonitoring() =>
+    RustLib.instance.api.crateApiMonitorStopMonitoring();

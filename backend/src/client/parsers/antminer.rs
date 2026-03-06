@@ -43,6 +43,7 @@ impl MinerResponseParser for AntminerParser {
             software: None,
             hardware: None,
             mac_address: None,
+            power_mode: None,
         })
     }
 
@@ -85,6 +86,17 @@ impl MinerResponseParser for AntminerParser {
 
         // 4. Get MAC Address
         stats.mac_address = lookup_mac_address(ip).await;
+
+        // 5. Read power mode from miner conf (Antminer only)
+        //    Uses its own AppSettings load — mirrors set_miner_power_mode path.
+        {
+            use crate::client::antminer_web::AntminerWebClient;
+            let settings = crate::core::config::AppSettings::load();
+            let creds = settings.antminer_credentials;
+            if let Ok(conf) = AntminerWebClient::read_power_mode(ip, &creds.username, &creds.password).await {
+                stats.power_mode = Some(conf);
+            }
+        }
 
         Ok(())
     }

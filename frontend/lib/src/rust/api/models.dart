@@ -8,77 +8,65 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'models.freezed.dart';
 
-            // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
+/// Result of a batch command execution
+class CommandResult {
+  final String ip;
+  final bool success;
+  final String? error;
 
-            
+  const CommandResult({required this.ip, required this.success, this.error});
 
-            /// Result of a batch command execution
-class CommandResult  {
-                final String ip;
-final bool success;
-final String? error;
+  @override
+  int get hashCode => ip.hashCode ^ success.hashCode ^ error.hashCode;
 
-                const CommandResult({required this.ip ,required this.success ,this.error ,});
-
-                
-                
-
-                
-        @override
-        int get hashCode => ip.hashCode^success.hashCode^error.hashCode;
-        
-
-                
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is CommandResult &&
-                runtimeType == other.runtimeType
-                && ip == other.ip&& success == other.success&& error == other.error;
-        
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CommandResult &&
+          runtimeType == other.runtimeType &&
+          ip == other.ip &&
+          success == other.success &&
+          error == other.error;
+}
 
 @freezed
-                sealed class MinerCommand with _$MinerCommand  {
-                    const MinerCommand._();
+sealed class MinerCommand with _$MinerCommand {
+  const MinerCommand._();
 
-                     const factory MinerCommand.reboot() = MinerCommand_Reboot;
- const factory MinerCommand.blinkLed() = MinerCommand_BlinkLed;
- const factory MinerCommand.stopBlink() = MinerCommand_StopBlink;
- const factory MinerCommand.setPools({   required List<PoolConfig> pools , }) = MinerCommand_SetPools;
-
-                    
-
-                    
-                }
+  const factory MinerCommand.reboot() = MinerCommand_Reboot;
+  const factory MinerCommand.blinkLed() = MinerCommand_BlinkLed;
+  const factory MinerCommand.stopBlink() = MinerCommand_StopBlink;
+  const factory MinerCommand.setPools({required List<PoolConfig> pools}) =
+      MinerCommand_SetPools;
+}
 
 /// A mining pool configuration entry.
 /// This is the FRB-visible version of `AntminerPool`.
-class PoolConfig  {
-                final String url;
-final String worker;
-final String password;
+class PoolConfig {
+  final String url;
+  final String worker;
+  final String password;
 
-                const PoolConfig({required this.url ,required this.worker ,required this.password ,});
+  const PoolConfig({
+    required this.url,
+    required this.worker,
+    required this.password,
+  });
 
-                
-                
+  @override
+  int get hashCode => url.hashCode ^ worker.hashCode ^ password.hashCode;
 
-                
-        @override
-        int get hashCode => url.hashCode^worker.hashCode^password.hashCode;
-        
-
-                
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is PoolConfig &&
-                runtimeType == other.runtimeType
-                && url == other.url&& worker == other.worker&& password == other.password;
-        
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PoolConfig &&
+          runtimeType == other.runtimeType &&
+          url == other.url &&
+          worker == other.worker &&
+          password == other.password;
+}
 
 /// Power mode for a miner.
 ///
@@ -91,11 +79,4 @@ final String password;
 ///   - Normal → "Normal"
 ///   - Lpm    → "Low"
 ///   - Sleep  → "Low"  (no dedicated sleep mode; falls back to Low)
-enum PowerMode {
-                    normal,
-lpm,
-sleep,
-                    ;
-                    
-                }
-            
+enum PowerMode { normal, lpm, sleep }

@@ -7,12 +7,8 @@ import '../core/config.dart';
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+AppSettings getAppSettings() =>
+    RustLib.instance.api.crateApiSettingsGetAppSettings();
 
-            
-
-            AppSettings  getAppSettings() => RustLib.instance.api.crateApiSettingsGetAppSettings();
-
-void  saveAppSettings({required AppSettings settings }) => RustLib.instance.api.crateApiSettingsSaveAppSettings(settings: settings);
-
-            
-            
+void saveAppSettings({required AppSettings settings}) =>
+    RustLib.instance.api.crateApiSettingsSaveAppSettings(settings: settings);

@@ -295,6 +295,13 @@ impl AntminerWebClient {
         Ok(())
     }
 
+    /// Read the current power mode without changing anything.
+    /// Returns the raw `miner-mode` u8 value (0=Normal, 1=Sleep, 2=LPM).
+    pub async fn read_power_mode(ip: &str, username: &str, password: &str) -> Result<u8> {
+        let conf = Self::get_miner_conf(ip, username, password).await?;
+        Ok(conf.miner_mode)
+    }
+
     /// Configure up to three mining pools.
     ///
     /// Uses a **read-modify-write** pattern: the current config is fetched

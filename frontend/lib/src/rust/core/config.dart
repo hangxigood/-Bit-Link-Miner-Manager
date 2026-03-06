@@ -6,59 +6,52 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+class AppSettings {
+  final MinerCredentials antminerCredentials;
+  final MinerCredentials whatsminerCredentials;
+  final int scanThreadCount;
+  final BigInt monitorInterval;
 
-            
+  const AppSettings({
+    required this.antminerCredentials,
+    required this.whatsminerCredentials,
+    required this.scanThreadCount,
+    required this.monitorInterval,
+  });
 
-            
+  @override
+  int get hashCode =>
+      antminerCredentials.hashCode ^
+      whatsminerCredentials.hashCode ^
+      scanThreadCount.hashCode ^
+      monitorInterval.hashCode;
 
-            class AppSettings  {
-                final MinerCredentials antminerCredentials;
-final MinerCredentials whatsminerCredentials;
-final int scanThreadCount;
-final BigInt monitorInterval;
-
-                const AppSettings({required this.antminerCredentials ,required this.whatsminerCredentials ,required this.scanThreadCount ,required this.monitorInterval ,});
-
-                
-                
-
-                
-        @override
-        int get hashCode => antminerCredentials.hashCode^whatsminerCredentials.hashCode^scanThreadCount.hashCode^monitorInterval.hashCode;
-        
-
-                
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is AppSettings &&
-                runtimeType == other.runtimeType
-                && antminerCredentials == other.antminerCredentials&& whatsminerCredentials == other.whatsminerCredentials&& scanThreadCount == other.scanThreadCount&& monitorInterval == other.monitorInterval;
-        
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppSettings &&
+          runtimeType == other.runtimeType &&
+          antminerCredentials == other.antminerCredentials &&
+          whatsminerCredentials == other.whatsminerCredentials &&
+          scanThreadCount == other.scanThreadCount &&
+          monitorInterval == other.monitorInterval;
+}
 
 /// Configuration for miner authentication and connection settings
-class MinerCredentials  {
-                final String username;
-final String password;
+class MinerCredentials {
+  final String username;
+  final String password;
 
-                const MinerCredentials({required this.username ,required this.password ,});
+  const MinerCredentials({required this.username, required this.password});
 
-                
-                
+  @override
+  int get hashCode => username.hashCode ^ password.hashCode;
 
-                
-        @override
-        int get hashCode => username.hashCode^password.hashCode;
-        
-
-                
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is MinerCredentials &&
-                runtimeType == other.runtimeType
-                && username == other.username&& password == other.password;
-        
-            }
-            
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MinerCredentials &&
+          runtimeType == other.runtimeType &&
+          username == other.username &&
+          password == other.password;
+}

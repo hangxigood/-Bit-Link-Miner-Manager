@@ -441,6 +441,8 @@ class _MinerDataTableState extends State<MinerDataTable> {
         return _buildCell(miner.stats.software ?? '-', width);
       case ColumnConstants.idHardware:
         return _buildCell(miner.stats.hardware ?? '-', width);
+      case ColumnConstants.idPowerMode:
+        return _buildPowerModeCell(context, miner.stats.powerMode, width);
         
       default:
         // Try to handle indexed fields
@@ -580,6 +582,62 @@ class _MinerDataTableState extends State<MinerDataTable> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPowerModeCell(BuildContext context, int? mode, double width) {
+    Color color;
+    String label;
+
+    switch (mode) {
+      case 0:
+        color = context.success;
+        label = 'Normal';
+        break;
+      case 1:
+        color = context.error;
+        label = 'Sleep';
+        break;
+      case 2:
+        color = context.warning;
+        label = 'LPM';
+        break;
+      default:
+        color = context.mutedText;
+        label = '-';
+    }
+
+    return Container(
+      width: width,
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: mode == null
+          ? Text('-', style: TextStyle(fontSize: 11, color: context.mutedText))
+          : Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
