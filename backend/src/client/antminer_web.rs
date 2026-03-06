@@ -301,18 +301,31 @@ impl AntminerWebClient {
 
     /// Set the power mode.
     ///
-    /// `mode` is the raw Antminer work-mode value:
-    ///   - 0 → Normal
-    ///   - 1 → Sleep  (stops hashing, stays reachable)
-    ///   - 2 → Low Power Mode (LPM; reduced hashrate — only newer firmware)
+    /// Uses a **raw JSON round-trip**: parses the full miner config as
+    /// `serde_json::Value`.
+    /// 
+    /// **CRITICAL ANTMINER QUIRK**: The miner returns `"bitmain-work-mode"`
+    /// on GET, but it completely ignores it on POST. To actually change the
+    /// mode, we must send `"miner-mode"`. So we remove the GET key and
+    /// insert the POST key.
+    ///
+    /// Mode values: 0 = Normal, 1 = Sleep, 2 = LPM
     ///
     /// Triggers an automatic reboot.
     pub async fn set_power_mode(ip: &str, username: &str, password: &str, mode: u8) -> Result<()> {
-        let mut conf = Self::get_miner_conf(ip, username, password).await?;
-        conf.set_work_mode(mode);
+        let raw = Self::digest_get(ip, "/cgi-bin/get_miner_conf.cgi", username, password).await?;
+        let mut conf: serde_json::Value = serde_json::from_str(raw.trim())
+            .map_err(|e| format!("Failed to parse miner conf for {}: {} — raw: {}", ip, e, &raw[..raw.len().min(300)]))?;
+
+        if let Some(obj) = conf.as_object_mut() {
+            obj.remove("bitmain-work-mode"); // Strip the 'read' key
+            obj.insert("miner-mode".to_string(), serde_json::Value::String(mode.to_string())); // Set the 'write' key
+        }
+
         let body = serde_json::to_string(&conf)
             .map_err(|e| format!("Failed to serialise miner conf: {}", e))?;
-        // Miner reboots on mode change — use tolerant POST
+
+        println!("[antminer_web] set_power_mode({}) for {} — body: {}", mode, ip, &body[..body.len().min(200)]);
         Self::digest_post_tolerant(ip, "/cgi-bin/set_miner_conf.cgi", username, password, body).await?;
         Ok(())
     }
@@ -320,33 +333,44 @@ impl AntminerWebClient {
     /// Read the current power mode without changing anything.
     /// Returns the raw work-mode u8 value (0=Normal, 1=Sleep, 2=LPM).
     pub async fn read_power_mode(ip: &str, username: &str, password: &str) -> Result<u8> {
-        let conf = Self::get_miner_conf(ip, username, password).await?;
-        Ok(conf.work_mode_u8())
+        let raw = Self::digest_get(ip, "/cgi-bin/get_miner_conf.cgi", username, password).await?;
+        let conf: serde_json::Value = serde_json::from_str(raw.trim())
+            .map_err(|e| format!("Failed to parse miner conf for {}: {}", ip, e))?;
+        let mode = conf["bitmain-work-mode"]
+            .as_str()
+            .and_then(|s| s.trim().parse::<u8>().ok())
+            .unwrap_or(0);
+        Ok(mode)
     }
 
     /// Configure up to three mining pools.
     ///
-    /// Uses a **read-modify-write** pattern: the current config is fetched
-    /// first so that fan / frequency / power-mode settings are preserved.
-    ///
-    /// The miner will **automatically reboot** 2-3 minutes after this call
-    /// if the pool configuration changed.
-    pub async fn set_pools(
-        ip: &str,
-        username: &str,
-        password: &str,
-        pools: Vec<AntminerPool>,
-    ) -> Result<()> {
-        if pools.is_empty() || pools.len() > 3 {
-            return Err("set_pools: must supply 1–3 pools".into());
+    /// Uses a **raw JSON round-trip**: parses the full miner config as
+    /// `serde_json::Value`, mutates only the `"pools"` array, and POSTs
+    /// the entire blob back.
+    pub async fn set_pools(ip: &str, username: &str, password: &str, pools: Vec<crate::api::models::PoolConfig>) -> Result<()> {
+        if pools.is_empty() {
+            return Err(crate::core::MinerError::InvalidResponse);
         }
 
-        let mut conf = Self::get_miner_conf(ip, username, password).await?;
-        conf.pools = pools;
+        let raw = Self::digest_get(ip, "/cgi-bin/get_miner_conf.cgi", username, password).await?;
+        let mut conf: serde_json::Value = serde_json::from_str(raw.trim())
+            .map_err(|e| format!("Failed to parse miner conf for {}: {} — raw: {}", ip, e, &raw[..raw.len().min(300)]))?;
+
+        let mut ant_pools = Vec::new();
+        for p in pools.into_iter().take(3) {
+            ant_pools.push(serde_json::json!({
+                "url": p.url,
+                "user": p.worker,
+                "pass": p.password
+            }));
+        }
+        conf["pools"] = serde_json::Value::Array(ant_pools);
 
         let body = serde_json::to_string(&conf)
             .map_err(|e| format!("Failed to serialise miner conf: {}", e))?;
-        // Miner reboots after pool change — use tolerant POST
+
+        println!("[antminer_web] set_pools for {} — body: {}", ip, &body[..body.len().min(200)]);
         Self::digest_post_tolerant(ip, "/cgi-bin/set_miner_conf.cgi", username, password, body).await?;
         Ok(())
     }

@@ -117,12 +117,7 @@ async fn execute_antminer_command(
         }
 
         MinerCommand::SetPools { pools } => {
-            use crate::client::antminer_web::AntminerPool;
-            let antminer_pools: Vec<AntminerPool> = pools
-                .into_iter()
-                .map(|p| AntminerPool { url: p.url, user: p.worker, pass: p.password })
-                .collect();
-            match AntminerWebClient::set_pools(&ip, user, pass, antminer_pools).await {
+            match AntminerWebClient::set_pools(&ip, user, pass, pools).await {
                 Ok(_) => {
                     println!("Antminer set_pools SUCCESS for {} (will reboot automatically)", ip);
                     CommandResult { ip, success: true, error: None }
@@ -206,16 +201,11 @@ pub fn test_connection(ip: String) -> String {
 ///
 /// `pools` must have 1–3 entries.
 pub async fn set_miner_pools(ip: String, pools: Vec<crate::api::models::PoolConfig>) -> CommandResult {
-    use crate::client::antminer_web::{AntminerWebClient, AntminerPool};
+    use crate::client::antminer_web::AntminerWebClient;
     let settings = AppSettings::load();
     let creds = settings.antminer_credentials;
 
-    let antminer_pools: Vec<AntminerPool> = pools
-        .into_iter()
-        .map(|p| AntminerPool { url: p.url, user: p.worker, pass: p.password })
-        .collect();
-
-    match AntminerWebClient::set_pools(&ip, &creds.username, &creds.password, antminer_pools).await {
+    match AntminerWebClient::set_pools(&ip, &creds.username, &creds.password, pools).await {
         Ok(_) => CommandResult { ip, success: true, error: None },
         Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
     }
