@@ -87,14 +87,23 @@ impl MinerResponseParser for AntminerParser {
         // 4. Get MAC Address
         stats.mac_address = lookup_mac_address(ip).await;
 
-        // 5. Read power mode from miner conf (Antminer only)
+        // 5. Read power mode from miner conf (Antminer only).
         //    Uses its own AppSettings load — mirrors set_miner_power_mode path.
+        //    On failure (wrong creds, timeout, sleep-mode quirk) we keep whatever
+        //    value `stats.power_mode` already has so a transient error doesn't
+        //    erase the last known good value.
         {
             use crate::client::antminer_web::AntminerWebClient;
             let settings = crate::core::config::AppSettings::load();
             let creds = settings.antminer_credentials;
-            if let Ok(conf) = AntminerWebClient::read_power_mode(ip, &creds.username, &creds.password).await {
-                stats.power_mode = Some(conf);
+            match AntminerWebClient::read_power_mode(ip, &creds.username, &creds.password).await {
+                Ok(mode) => {
+                    stats.power_mode = Some(mode);
+                }
+                Err(e) => {
+                    println!("[antminer] read_power_mode failed for {}: {} (keeping previous value {:?})", ip, e, stats.power_mode);
+                    // keep stats.power_mode as-is (it was pre-set by caller for monitor path)
+                }
             }
         }
 
