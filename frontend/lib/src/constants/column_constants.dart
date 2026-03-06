@@ -27,6 +27,7 @@ class ColumnConstants {
   static const String idFirmware = 'firmware';
   static const String idSoftware = 'software';
   static const String idHardware = 'hardware';
+  static const String idPowerMode = 'power_mode';
 
   // Default Widths
   static const double widthIp = 130.0;
@@ -72,6 +73,7 @@ class ColumnConstants {
       case idFirmware:
       case idSoftware:
       case idHardware: return widthMeta;
+      case idPowerMode: return 110.0;
       default: return widthDefault;
     }
   }

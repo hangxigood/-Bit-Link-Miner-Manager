@@ -37,6 +37,11 @@ pub struct MinerStats {
     pub software: Option<String>,    // "Bmminer X.X.X"
     pub hardware: Option<String>,    // "uart_trans.X.X"
     pub mac_address: Option<String>, // Keep this if we find it later
+
+    /// Current power mode as raw Antminer `miner-mode` value:
+    ///   0 = Normal, 1 = Sleep, 2 = LPM
+    /// `None` if not yet read or unsupported.
+    pub power_mode: Option<u8>,
 }
 
 /// Status of a miner
@@ -70,6 +75,7 @@ impl Default for MinerStats {
             software: None,
             hardware: None,
             mac_address: None,
+            power_mode: None,
         }
     }
 }

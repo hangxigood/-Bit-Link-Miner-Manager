@@ -111,7 +111,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<CommandResult> crateApiCommandsSetMinerPowerMode({
     required String ip,
-    required bool sleep,
+    required PowerMode mode,
   });
 
   Future<void> crateApiMonitorStartMonitoring({required List<Miner> miners});
@@ -388,14 +388,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<CommandResult> crateApiCommandsSetMinerPowerMode({
     required String ip,
-    required bool sleep,
+    required PowerMode mode,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(ip, serializer);
-          sse_encode_bool(sleep, serializer);
+          sse_encode_power_mode(mode, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -408,7 +408,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiCommandsSetMinerPowerModeConstMeta,
-        argValues: [ip, sleep],
+        argValues: [ip, mode],
         apiImpl: this,
       ),
     );
@@ -417,7 +417,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiCommandsSetMinerPowerModeConstMeta =>
       const TaskConstMeta(
         debugName: "set_miner_power_mode",
-        argNames: ["ip", "sleep"],
+        argNames: ["ip", "mode"],
       );
 
   @override
@@ -622,6 +622,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_box_autoadd_u_8(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   CommandResult dco_decode_command_result(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -738,8 +744,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   MinerStats dco_decode_miner_stats(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 19)
-      throw Exception('unexpected arr length: expect 19 but see ${arr.length}');
+    if (arr.length != 20)
+      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
     return MinerStats(
       hashrateRt: dco_decode_f_64(arr[0]),
       hashrateAvg: dco_decode_f_64(arr[1]),
@@ -760,6 +766,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       software: dco_decode_opt_String(arr[16]),
       hardware: dco_decode_opt_String(arr[17]),
       macAddress: dco_decode_opt_String(arr[18]),
+      powerMode: dco_decode_opt_box_autoadd_u_8(arr[19]),
     );
   }
 
@@ -794,6 +801,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_8(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_8(raw);
+  }
+
+  @protected
   PoolConfig dco_decode_pool_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -804,6 +817,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       worker: dco_decode_String(arr[1]),
       password: dco_decode_String(arr[2]),
     );
+  }
+
+  @protected
+  PowerMode dco_decode_power_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return PowerMode.values[raw as int];
   }
 
   @protected
@@ -899,6 +918,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_u_32(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_u_8(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_8(deserializer));
   }
 
   @protected
@@ -1074,6 +1099,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_software = sse_decode_opt_String(deserializer);
     var var_hardware = sse_decode_opt_String(deserializer);
     var var_macAddress = sse_decode_opt_String(deserializer);
+    var var_powerMode = sse_decode_opt_box_autoadd_u_8(deserializer);
     return MinerStats(
       hashrateRt: var_hashrateRt,
       hashrateAvg: var_hashrateAvg,
@@ -1094,6 +1120,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       software: var_software,
       hardware: var_hardware,
       macAddress: var_macAddress,
+      powerMode: var_powerMode,
     );
   }
 
@@ -1151,12 +1178,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_8(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_8(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   PoolConfig sse_decode_pool_config(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_url = sse_decode_String(deserializer);
     var var_worker = sse_decode_String(deserializer);
     var var_password = sse_decode_String(deserializer);
     return PoolConfig(url: var_url, worker: var_worker, password: var_password);
+  }
+
+  @protected
+  PowerMode sse_decode_power_mode(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return PowerMode.values[inner];
   }
 
   @protected
@@ -1249,6 +1294,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_8(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_8(self, serializer);
   }
 
   @protected
@@ -1405,6 +1456,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.software, serializer);
     sse_encode_opt_String(self.hardware, serializer);
     sse_encode_opt_String(self.macAddress, serializer);
+    sse_encode_opt_box_autoadd_u_8(self.powerMode, serializer);
   }
 
   @protected
@@ -1457,11 +1509,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_u_8(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_8(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_pool_config(PoolConfig self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.url, serializer);
     sse_encode_String(self.worker, serializer);
     sse_encode_String(self.password, serializer);
+  }
+
+  @protected
+  void sse_encode_power_mode(PowerMode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected

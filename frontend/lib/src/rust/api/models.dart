@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'models.freezed.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Result of a batch command execution
 class CommandResult {
@@ -67,3 +67,16 @@ class PoolConfig {
           worker == other.worker &&
           password == other.password;
 }
+
+/// Power mode for a miner.
+///
+/// Antminer miner-mode values (field `miner-mode` in `set_miner_conf.cgi`):
+///   - Normal → 0
+///   - Sleep  → 1   (miner stops hashing, stays reachable)
+///   - Lpm    → 3   (Low Power Mode — reduced hashrate; not all firmware supports this)
+///
+/// Whatsminer (LuCI `miner_type` field):
+///   - Normal → "Normal"
+///   - Lpm    → "Low"
+///   - Sleep  → "Low"  (no dedicated sleep mode; falls back to Low)
+enum PowerMode { normal, lpm, sleep }

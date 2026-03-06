@@ -40,15 +40,13 @@ Future<CommandResult> setMinerPools({
 Future<List<PoolConfig>> getMinerPools({required String ip}) =>
     RustLib.instance.api.crateApiCommandsGetMinerPools(ip: ip);
 
-/// Set the power mode on a single Antminer via its HTTP API.
-/// - `sleep = true`  → Low Power Mode (LPM) — miner reduces hashrate to save power
-/// - `sleep = false` → Normal mode — miner resumes full operation
+/// Set the power mode on a miner. Detects Whatsminer vs Antminer automatically.
 ///
-/// The miner will automatically reboot after applying the change.
+/// PowerMode mapping:
+///   Antminer  — Normal=0, Sleep=1, Lpm=3 (via `miner-mode` field in set_miner_conf.cgi)
+///   Whatsminer — Normal="Normal", Lpm="Low", Sleep="Low" (no dedicated sleep, falls back to Low)
 Future<CommandResult> setMinerPowerMode({
   required String ip,
-  required bool sleep,
-}) => RustLib.instance.api.crateApiCommandsSetMinerPowerMode(
-  ip: ip,
-  sleep: sleep,
-);
+  required PowerMode mode,
+}) =>
+    RustLib.instance.api.crateApiCommandsSetMinerPowerMode(ip: ip, mode: mode);

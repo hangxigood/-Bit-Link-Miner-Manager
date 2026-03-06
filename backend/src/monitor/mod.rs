@@ -136,9 +136,17 @@ async fn poll_single_miner(
     // Update the miner state
     if let Some(mut entry) = state.get_mut(&ip) {
         let old_status = entry.status.clone();
+        // Remember last known power_mode so a transient HTTP failure
+        // doesn't erase it (fetch_details keeps the value if the call fails,
+        // but get_summary creates a fresh MinerStats default().  We restore it here.)
+        let prev_power_mode = entry.stats.power_mode;
         
         match stats_result {
-            Some(stats) => {
+            Some(mut stats) => {
+                // Preserve last known power_mode if the new read returned None
+                if stats.power_mode.is_none() {
+                    stats.power_mode = prev_power_mode;
+                }
                 // Update stats and model
                 entry.model = stats.model.clone();
                 entry.stats = stats;

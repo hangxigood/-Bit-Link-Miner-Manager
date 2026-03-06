@@ -8,7 +8,7 @@ import 'package:frontend/src/models/data_column_config.dart';
 import 'package:frontend/src/constants/column_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class MinerDataTable extends StatelessWidget {
+class MinerDataTable extends StatefulWidget {
   final List<Miner> miners;
   final List<String> selectedIps;
   final Function(List<String>) onSelectionChanged;
@@ -44,22 +44,66 @@ class MinerDataTable extends StatelessWidget {
     required this.onColumnWidthChanged,
   });
 
+  @override
+  State<MinerDataTable> createState() => _MinerDataTableState();
+}
+
+class _MinerDataTableState extends State<MinerDataTable> {
+  late final ScrollController _horizontalScrollController;
+  late final ScrollController _scrollbarController;
+
+  @override
+  void initState() {
+    super.initState();
+    _horizontalScrollController = ScrollController();
+    _scrollbarController = ScrollController();
+
+    // Sync scroll positions
+    _horizontalScrollController.addListener(_syncScrollbarFromContent);
+    _scrollbarController.addListener(_syncContentFromScrollbar);
+  }
+
+  void _syncScrollbarFromContent() {
+    if (_scrollbarController.hasClients &&
+        _horizontalScrollController.hasClients &&
+        _scrollbarController.offset != _horizontalScrollController.offset) {
+      _scrollbarController.jumpTo(_horizontalScrollController.offset);
+    }
+  }
+
+  void _syncContentFromScrollbar() {
+    if (_horizontalScrollController.hasClients &&
+        _scrollbarController.hasClients &&
+        _horizontalScrollController.offset != _scrollbarController.offset) {
+      _horizontalScrollController.jumpTo(_scrollbarController.offset);
+    }
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.removeListener(_syncScrollbarFromContent);
+    _scrollbarController.removeListener(_syncContentFromScrollbar);
+    _horizontalScrollController.dispose();
+    _scrollbarController.dispose();
+    super.dispose();
+  }
+
   void _toggleSelectAll() {
-    if (selectedIps.length == miners.length && miners.isNotEmpty) {
-      onSelectionChanged([]);
+    if (widget.selectedIps.length == widget.miners.length && widget.miners.isNotEmpty) {
+      widget.onSelectionChanged([]);
     } else {
-      onSelectionChanged(miners.map((m) => m.ip).toList());
+      widget.onSelectionChanged(widget.miners.map((m) => m.ip).toList());
     }
   }
 
   void _toggleSelection(String ip) {
-    final newSelection = List<String>.from(selectedIps);
+    final newSelection = List<String>.from(widget.selectedIps);
     if (newSelection.contains(ip)) {
       newSelection.remove(ip);
     } else {
       newSelection.add(ip);
     }
-    onSelectionChanged(newSelection);
+    widget.onSelectionChanged(newSelection);
   }
 
   String _formatSingleTemp(double? temp) {
@@ -98,7 +142,7 @@ class MinerDataTable extends StatelessWidget {
   
   double _getColumnWidth(String id) {
     try {
-      return visibleColumns.firstWhere((c) => c.id == id).width;
+      return widget.visibleColumns.firstWhere((c) => c.id == id).width;
     } catch (_) {
       return 100.0;
     }
@@ -106,9 +150,9 @@ class MinerDataTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalPages = (totalItems / pageSize).ceil();
-    final startItem = currentPage * pageSize + 1;
-    final endItem = ((currentPage + 1) * pageSize).clamp(0, totalItems);
+    final totalPages = (widget.totalItems / widget.pageSize).ceil();
+    final startItem = widget.currentPage * widget.pageSize + 1;
+    final endItem = ((widget.currentPage + 1) * widget.pageSize).clamp(0, widget.totalItems);
 
     return Column(
       children: [
@@ -120,7 +164,7 @@ class MinerDataTable extends StatelessWidget {
               builder: (context, constraints) {
                 // Calculate total content width (checkbox + all visible columns)
                 final contentWidth = 50.0 +
-                    visibleColumns
+                    widget.visibleColumns
                         .where((c) => c.visible)
                         .fold<double>(0, (sum, col) => sum + _getColumnWidth(col.id));
 
@@ -129,30 +173,58 @@ class MinerDataTable extends StatelessWidget {
                     ? contentWidth
                     : constraints.maxWidth;
 
-                return SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: tableWidth,
-                      child: Column(
-                        children: [
-                          _buildHeader(context),
-                          ...miners.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final miner = entry.value;
-                            return _buildRow(context, miner, index);
-                          }),
-                        ],
+                return Column(
+                  children: [
+                    // Scrollable content area
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight - (contentWidth > constraints.maxWidth ? 12 : 0),
+                          ),
+                          child: SingleChildScrollView(
+                            controller: _horizontalScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: tableWidth,
+                              child: Column(
+                                children: [
+                                  _buildHeader(context),
+                                  ...widget.miners.asMap().entries.map((entry) {
+                                    final index = entry.key;
+                                    final miner = entry.value;
+                                    return _buildRow(context, miner, index);
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    // Fixed scrollbar at bottom
+                    if (contentWidth > constraints.maxWidth)
+                      Container(
+                        height: 12,
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Scrollbar(
+                          controller: _scrollbarController,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _scrollbarController,
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(width: tableWidth, height: 1),
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),
           ),
         ),
-        
+
         // Footer
         _buildFooter(context, startItem, endItem, totalPages),
       ],
@@ -173,14 +245,14 @@ class MinerDataTable extends StatelessWidget {
           SizedBox(
             width: 50,
             child: Checkbox(
-              value: miners.isNotEmpty && selectedIps.length == miners.length,
+              value: widget.miners.isNotEmpty && widget.selectedIps.length == widget.miners.length,
               tristate: true,
               onChanged: (_) => _toggleSelectAll(),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
           // Dynamic columns
-          ...visibleColumns.where((c) => c.visible).map((col) {
+          ...widget.visibleColumns.where((c) => c.visible).map((col) {
             TextAlign align = TextAlign.left;
             // Right-align numeric columns
             if (['hashrate_rt', 'hashrate_avg',
@@ -200,8 +272,8 @@ class MinerDataTable extends StatelessWidget {
   Widget _buildHeaderCell(String label, String column, double width, {TextAlign align = TextAlign.left}) {
     return Builder(
       builder: (context) {
-        final isActive = sortColumn == column;
-        
+        final isActive = widget.sortColumn == column;
+
         return Container(
           width: width,
           decoration: BoxDecoration(
@@ -212,7 +284,7 @@ class MinerDataTable extends StatelessWidget {
           child: Stack(
             children: [
               InkWell(
-                onTap: () => onSortChanged(column),
+                onTap: () => widget.onSortChanged(column),
                 child: Container(
                   width: width,
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -233,7 +305,7 @@ class MinerDataTable extends StatelessWidget {
                       SizedBox(width: 4),
                       if (isActive)
                         Icon(
-                          sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                          widget.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
                           size: 14,
                           color: Theme.of(context).colorScheme.primary,
                         ),
@@ -253,7 +325,7 @@ class MinerDataTable extends StatelessWidget {
                     onHorizontalDragUpdate: (details) {
                       final newWidth = width + details.delta.dx;
                       if (newWidth >= 50) {
-                        onColumnWidthChanged(column, newWidth);
+                        widget.onColumnWidthChanged(column, newWidth);
                       }
                     },
                     child: Container(
@@ -270,7 +342,7 @@ class MinerDataTable extends StatelessWidget {
   }
 
   Widget _buildRow(BuildContext context, Miner miner, int index) {
-    final isSelected = selectedIps.contains(miner.ip);
+    final isSelected = widget.selectedIps.contains(miner.ip);
     final isEven = index % 2 == 0;
 
     return InkWell(
@@ -280,12 +352,12 @@ class MinerDataTable extends StatelessWidget {
         String username = settings.antminerCredentials.username;
         String password = settings.antminerCredentials.password;
 
-        if (miner.model?.toLowerCase().contains('whatsminer') == true || 
+        if (miner.model?.toLowerCase().contains('whatsminer') == true ||
             miner.stats.firmware?.toLowerCase().contains('whatsminer') == true) {
           username = settings.whatsminerCredentials.username;
           password = settings.whatsminerCredentials.password;
         }
-        
+
         // Embed credentials for auto-login (Digest Auth)
         final url = Uri.parse('http://$username:$password@${miner.ip}');
         if (await canLaunchUrl(url)) {
@@ -319,7 +391,7 @@ class MinerDataTable extends StatelessWidget {
               ),
             ),
             // Dynamic cells
-            ...visibleColumns.where((c) => c.visible).map((col) {
+            ...widget.visibleColumns.where((c) => c.visible).map((col) {
               return _buildCellForId(context, miner, col.id);
             }),
           ],
@@ -337,7 +409,7 @@ class MinerDataTable extends StatelessWidget {
       case ColumnConstants.idStatus:
         return _buildStatusCell(context, miner.status, width);
       case ColumnConstants.idLocate:
-        final isBlinking = blinkingIps.contains(miner.ip);
+        final isBlinking = widget.blinkingIps.contains(miner.ip);
         return Container(
           width: width,
           alignment: Alignment.center,
@@ -346,7 +418,7 @@ class MinerDataTable extends StatelessWidget {
             scale: 0.8,
             child: Switch(
               value: isBlinking,
-              onChanged: (val) => onBlinkToggle(miner.ip, val),
+              onChanged: (val) => widget.onBlinkToggle(miner.ip, val),
               activeColor: Theme.of(context).colorScheme.primary,
             ),
           ),
@@ -369,6 +441,8 @@ class MinerDataTable extends StatelessWidget {
         return _buildCell(miner.stats.software ?? '-', width);
       case ColumnConstants.idHardware:
         return _buildCell(miner.stats.hardware ?? '-', width);
+      case ColumnConstants.idPowerMode:
+        return _buildPowerModeCell(context, miner.stats.powerMode, width);
         
       default:
         // Try to handle indexed fields
@@ -511,6 +585,62 @@ class MinerDataTable extends StatelessWidget {
     );
   }
 
+  Widget _buildPowerModeCell(BuildContext context, int? mode, double width) {
+    Color color;
+    String label;
+
+    switch (mode) {
+      case 0:
+        color = context.success;
+        label = 'Normal';
+        break;
+      case 1:
+        color = context.error;
+        label = 'Sleep';
+        break;
+      case 3:
+        color = context.warning;
+        label = 'LPM';
+        break;
+      default:
+        color = context.mutedText;
+        label = '-';
+    }
+
+    return Container(
+      width: width,
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: mode == null
+          ? Text('-', style: TextStyle(fontSize: 11, color: context.mutedText))
+          : Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
   Widget _buildPoolCell(BuildContext context, String? poolUrl, double width) {
     final stripped = _stripProtocol(poolUrl);
 
@@ -544,28 +674,28 @@ class MinerDataTable extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            '$totalItems miners',
+            '${widget.totalItems} miners',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
           ),
           SizedBox(width: 16),
           Text(
-            '${selectedIps.length} selected',
+            '${widget.selectedIps.length} selected',
             style: TextStyle(fontSize: 12, color: context.mutedText),
           ),
           Spacer(),
           Text(
-            'Showing $startItem-$endItem of $totalItems',
+            'Showing $startItem-$endItem of ${widget.totalItems}',
             style: TextStyle(fontSize: 12, color: context.mutedText),
           ),
           SizedBox(width: 16),
           IconButton(
             icon: Icon(Icons.chevron_left, size: 20),
-            onPressed: currentPage > 0 ? () => onPageChanged(currentPage - 1) : null,
+            onPressed: widget.currentPage > 0 ? () => widget.onPageChanged(widget.currentPage - 1) : null,
             tooltip: 'Previous page',
           ),
           IconButton(
             icon: Icon(Icons.chevron_right, size: 20),
-            onPressed: currentPage < totalPages - 1 ? () => onPageChanged(currentPage + 1) : null,
+            onPressed: widget.currentPage < totalPages - 1 ? () => widget.onPageChanged(widget.currentPage + 1) : null,
             tooltip: 'Next page',
           ),
           SizedBox(width: 8),
@@ -577,7 +707,7 @@ class MinerDataTable extends StatelessWidget {
           SizedBox(width: 8),
           IconButton(
             icon: Icon(Icons.view_column, size: 18),
-            onPressed: onShowColumnSettings,
+            onPressed: widget.onShowColumnSettings,
             tooltip: 'Column Settings',
             padding: EdgeInsets.zero,
             constraints: BoxConstraints(),

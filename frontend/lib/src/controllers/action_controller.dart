@@ -2,12 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:frontend/src/controllers/dashboard_controller.dart';
 import 'package:frontend/src/rust/api/commands.dart' as commands;
-import 'package:frontend/src/rust/api/commands.dart' show MinerCommand, CommandResult, setMinerPools;
-import 'package:frontend/src/rust/api/models.dart';
+import 'package:frontend/src/rust/api/commands.dart' show setMinerPools, setMinerPowerMode;
+import 'package:frontend/src/rust/api/models.dart' show MinerCommand, CommandResult, PoolConfig, PowerMode;
 import 'package:frontend/src/rust/core/models.dart';
 import 'package:frontend/src/rust/core/config.dart';
 import 'package:frontend/src/widgets/reboot_progress_dialog.dart';
 import 'package:frontend/src/widgets/reboot_config_dialog.dart';
+import 'package:frontend/src/widgets/config_batch_dialog.dart';
 
 class ActionController {
   final DashboardController _dashboardController;
@@ -36,6 +37,185 @@ class ActionController {
   /// for concurrent pool+power-mode dispatch.
   Future<CommandResult> setPoolsForIp(String ip, List<PoolConfig> pools) =>
       setMinerPools(ip: ip, pools: pools);
+
+  // --- Config (Batch / Staggered) ---
+
+  /// Entry point for Config All / Config Selected.
+  /// Shows the [ConfigBatchDialog] to choose immediate or staggered execution.
+  Future<void> runConfigWithDialog(
+    BuildContext context,
+    List<String> ips,
+    List<PoolConfig>? pools,
+    PowerMode? powerMode,
+  ) async {
+    if (ips.isEmpty) {
+      _onShowToast('No miners to configure');
+      return;
+    }
+    if (pools == null && powerMode == null) {
+      _onShowToast('Nothing to apply — configure pools or power mode first');
+      return;
+    }
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => ConfigBatchDialog(
+        totalMiners: ips.length,
+        title: 'Config ${ips.length} Miner${ips.length == 1 ? '' : 's'}',
+      ),
+    );
+
+    if (result == null) return;
+    if (!context.mounted) return;
+
+    final action = result['action'] as String;
+    final batchSize = result['batchSize'] as int;
+    final batchDelay = result['batchDelay'] as int;
+
+    if (action == 'at_once') {
+      await _executeConfigImmediate(ips, pools, powerMode);
+    } else {
+      await _executeStaggeredConfig(context, ips, pools, powerMode, batchSize, batchDelay);
+    }
+  }
+
+  Future<void> _executeConfigImmediate(
+    List<String> ips,
+    List<PoolConfig>? pools,
+    PowerMode? powerMode,
+  ) async {
+    _onShowToast('Applying config to ${ips.length} miner(s)…');
+    final results = await Future.wait(ips.map((ip) async {
+      final errors = <String>[];
+      if (pools != null) {
+        final r = await setMinerPools(ip: ip, pools: pools);
+        if (!r.success) errors.add('pools: ${r.error}');
+      }
+      if (powerMode != null) {
+        final r = await setMinerPowerMode(ip: ip, mode: powerMode);
+        if (!r.success) errors.add('power: ${r.error}');
+      }
+      return errors.isEmpty;
+    }));
+
+    final ok = results.where((r) => r).length;
+    final fail = results.length - ok;
+    if (fail == 0) {
+      _onShowToast('Config applied to $ok miner(s). Miners will reboot.');
+    } else {
+      _onShowToast('Config: $ok ok, $fail failed. Check credentials.');
+    }
+  }
+
+  Future<void> _executeStaggeredConfig(
+    BuildContext context,
+    List<String> ips,
+    List<PoolConfig>? pools,
+    PowerMode? powerMode,
+    int batchSize,
+    int batchDelay,
+  ) async {
+    final List<List<String>> batches = [];
+    for (var i = 0; i < ips.length; i += batchSize) {
+      batches.add(ips.sublist(i, (i + batchSize).clamp(0, ips.length)));
+    }
+
+    bool cancelled = false;
+
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => RebootProgressDialog(
+          totalMiners: ips.length,
+          totalBatches: batches.length,
+          batchDelay: batchDelay,
+          onCancel: () {
+            cancelled = true;
+            Navigator.of(dialogContext).pop();
+          },
+          stream: _executeConfigBatches(batches, pools, powerMode, batchDelay, () => cancelled),
+        ),
+      );
+    }
+  }
+
+  Stream<RebootProgressState> _executeConfigBatches(
+    List<List<String>> batches,
+    List<PoolConfig>? pools,
+    PowerMode? powerMode,
+    int batchDelay,
+    bool Function() isCancelled,
+  ) async* {
+    int completedMiners = 0;
+    int successCount = 0;
+    int failCount = 0;
+
+    for (var i = 0; i < batches.length; i++) {
+      if (isCancelled()) break;
+
+      yield RebootProgressState(
+        currentBatch: i + 1,
+        completedMiners: completedMiners,
+        successCount: successCount,
+        failCount: failCount,
+        isWaiting: false,
+        countdown: 0,
+      );
+
+      try {
+        final batchResults = await Future.wait(batches[i].map((ip) async {
+          final errors = <String>[];
+          if (pools != null) {
+            final r = await setMinerPools(ip: ip, pools: pools);
+            if (!r.success) errors.add('pools: ${r.error}');
+          }
+          if (powerMode != null) {
+            final r = await setMinerPowerMode(ip: ip, mode: powerMode);
+            if (!r.success) errors.add('power: ${r.error}');
+          }
+          return errors.isEmpty;
+        }));
+
+        completedMiners += batches[i].length;
+        successCount += batchResults.where((r) => r).length;
+        failCount += batchResults.where((r) => !r).length;
+      } catch (e) {
+        completedMiners += batches[i].length;
+        failCount += batches[i].length;
+      }
+
+      // Wait between batches
+      if (i < batches.length - 1 && !isCancelled()) {
+        for (var s = batchDelay; s > 0 && !isCancelled(); s--) {
+          yield RebootProgressState(
+            currentBatch: i + 1,
+            completedMiners: completedMiners,
+            successCount: successCount,
+            failCount: failCount,
+            isWaiting: true,
+            countdown: s,
+          );
+          await Future.delayed(Duration(seconds: 1));
+        }
+      }
+    }
+
+    if (!isCancelled()) {
+      yield RebootProgressState(
+        currentBatch: batches.length,
+        completedMiners: completedMiners,
+        successCount: successCount,
+        failCount: failCount,
+        isWaiting: false,
+        countdown: 0,
+        isComplete: true,
+      );
+      _onShowToast('Config complete: $successCount success, $failCount failed');
+    } else {
+      _onShowToast('Config cancelled: $successCount success, $failCount failed');
+    }
+  }
 
   // --- Scanning ---
 

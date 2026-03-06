@@ -64,6 +64,11 @@ class MinerStats {
   final String? hardware;
   final String? macAddress;
 
+  /// Current power mode as raw Antminer `miner-mode` value:
+  ///   0 = Normal, 1 = Sleep, 2 = LPM
+  /// `None` if not yet read or unsupported.
+  final int? powerMode;
+
   const MinerStats({
     required this.hashrateRt,
     required this.hashrateAvg,
@@ -84,6 +89,7 @@ class MinerStats {
     this.software,
     this.hardware,
     this.macAddress,
+    this.powerMode,
   });
 
   @override
@@ -106,7 +112,8 @@ class MinerStats {
       firmware.hashCode ^
       software.hashCode ^
       hardware.hashCode ^
-      macAddress.hashCode;
+      macAddress.hashCode ^
+      powerMode.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -131,7 +138,8 @@ class MinerStats {
           firmware == other.firmware &&
           software == other.software &&
           hardware == other.hardware &&
-          macAddress == other.macAddress;
+          macAddress == other.macAddress &&
+          powerMode == other.powerMode;
 }
 
 /// Status of a miner

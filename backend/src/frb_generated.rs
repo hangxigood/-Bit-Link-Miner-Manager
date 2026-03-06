@@ -383,13 +383,13 @@ fn wire__crate__api__commands__set_miner_power_mode_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_ip = <String>::sse_decode(&mut deserializer);
-            let api_sleep = <bool>::sse_decode(&mut deserializer);
+            let api_mode = <crate::api::models::PowerMode>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, ()>(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
-                            crate::api::commands::set_miner_power_mode(api_ip, api_sleep).await,
+                            crate::api::commands::set_miner_power_mode(api_ip, api_mode).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -810,6 +810,7 @@ impl SseDecode for crate::core::models::MinerStats {
         let mut var_software = <Option<String>>::sse_decode(deserializer);
         let mut var_hardware = <Option<String>>::sse_decode(deserializer);
         let mut var_macAddress = <Option<String>>::sse_decode(deserializer);
+        let mut var_powerMode = <Option<u8>>::sse_decode(deserializer);
         return crate::core::models::MinerStats {
             hashrate_rt: var_hashrateRt,
             hashrate_avg: var_hashrateAvg,
@@ -830,6 +831,7 @@ impl SseDecode for crate::core::models::MinerStats {
             software: var_software,
             hardware: var_hardware,
             mac_address: var_macAddress,
+            power_mode: var_powerMode,
         };
     }
 }
@@ -894,6 +896,17 @@ impl SseDecode for Option<u32> {
     }
 }
 
+impl SseDecode for Option<u8> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u8>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for crate::api::models::PoolConfig {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -904,6 +917,19 @@ impl SseDecode for crate::api::models::PoolConfig {
             url: var_url,
             worker: var_worker,
             password: var_password,
+        };
+    }
+}
+
+impl SseDecode for crate::api::models::PowerMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::models::PowerMode::Normal,
+            1 => crate::api::models::PowerMode::Lpm,
+            2 => crate::api::models::PowerMode::Sleep,
+            _ => unreachable!("Invalid variant for PowerMode: {}", inner),
         };
     }
 }
@@ -1118,6 +1144,7 @@ impl flutter_rust_bridge::IntoDart for crate::core::models::MinerStats {
             self.software.into_into_dart().into_dart(),
             self.hardware.into_into_dart().into_dart(),
             self.mac_address.into_into_dart().into_dart(),
+            self.power_mode.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1175,6 +1202,25 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::models::PoolConfig>
     for crate::api::models::PoolConfig
 {
     fn into_into_dart(self) -> crate::api::models::PoolConfig {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::models::PowerMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Normal => 0.into_dart(),
+            Self::Lpm => 1.into_dart(),
+            Self::Sleep => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::models::PowerMode {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::models::PowerMode>
+    for crate::api::models::PowerMode
+{
+    fn into_into_dart(self) -> crate::api::models::PowerMode {
         self
     }
 }
@@ -1371,6 +1417,7 @@ impl SseEncode for crate::core::models::MinerStats {
         <Option<String>>::sse_encode(self.software, serializer);
         <Option<String>>::sse_encode(self.hardware, serializer);
         <Option<String>>::sse_encode(self.mac_address, serializer);
+        <Option<u8>>::sse_encode(self.power_mode, serializer);
     }
 }
 
@@ -1432,12 +1479,39 @@ impl SseEncode for Option<u32> {
     }
 }
 
+impl SseEncode for Option<u8> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u8>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for crate::api::models::PoolConfig {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.url, serializer);
         <String>::sse_encode(self.worker, serializer);
         <String>::sse_encode(self.password, serializer);
+    }
+}
+
+impl SseEncode for crate::api::models::PowerMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::models::PowerMode::Normal => 0,
+                crate::api::models::PowerMode::Lpm => 1,
+                crate::api::models::PowerMode::Sleep => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 

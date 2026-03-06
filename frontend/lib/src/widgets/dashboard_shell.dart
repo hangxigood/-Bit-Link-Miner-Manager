@@ -4,7 +4,6 @@ import 'package:frontend/src/controllers/action_controller.dart';
 import 'package:frontend/src/controllers/dashboard_controller.dart';
 
 import 'package:frontend/src/rust/core/models.dart';
-import 'package:frontend/src/rust/api/commands.dart' show setMinerPowerMode;
 import 'package:frontend/src/services/column_service.dart';
 import 'package:frontend/src/widgets/column_settings_dialog.dart';
 import 'package:frontend/src/widgets/header_bar.dart';
@@ -62,52 +61,19 @@ class _DashboardShellState extends State<DashboardShell> {
     return await _ipRangesSectionKey.currentState?.scanSelectedRanges() ?? [];
   }
 
-  void _configSelected() {
-    _runConfig(_controller.selectedMinerIps);
+  void _configSelected(BuildContext context) {
+    _runConfig(context, _controller.selectedMinerIps);
   }
 
-  void _configAll() {
-    _runConfig(_controller.miners.map((m) => m.ip).toList());
+  void _configAll(BuildContext context) {
+    _runConfig(context, _controller.miners.map((m) => m.ip).toList());
   }
 
-  Future<void> _runConfig(List<String> ips) async {
-    if (ips.isEmpty) {
-      _showToast('No miners to configure');
-      return;
-    }
-
+  Future<void> _runConfig(BuildContext context, List<String> ips) async {
     final pools = _poolConfigSectionKey.currentState?.getEnabledPools();
-    final powerMode = _powerControlSectionKey.currentState?.getPowerMode();
+    final powerMode = _powerControlSectionKey.currentState?.getSelectedPowerMode();
 
-    if (pools == null && powerMode == null) {
-      _showToast('Nothing to apply — configure pools or power mode first');
-      return;
-    }
-
-    _showToast('Applying config to ${ips.length} miner(s)\u2026');
-
-    // Run all IPs concurrently
-    final results = await Future.wait(ips.map((ip) async {
-      final errors = <String>[];
-      if (pools != null) {
-        final r = await _actionController.setPoolsForIp(ip, pools);
-        if (!r.success) errors.add('pools: ${r.error}');
-      }
-      if (powerMode != null) {
-        final r = await setMinerPowerMode(ip: ip, sleep: powerMode);
-        if (!r.success) errors.add('power: ${r.error}');
-      }
-      return errors.isEmpty;
-    }));
-
-    final successCount = results.where((r) => r).length;
-    final failCount = results.length - successCount;
-
-    if (failCount == 0) {
-      _showToast('Config applied to $successCount miner(s). Miners will reboot.');
-    } else {
-      _showToast('Config: $successCount ok, $failCount failed. Check credentials.');
-    }
+    await _actionController.runConfigWithDialog(context, ips, pools, powerMode);
   }
 
   void _openColumnSettings() {
@@ -182,8 +148,8 @@ class _DashboardShellState extends State<DashboardShell> {
                         blinkingIps: _controller.blinkingIps,
                        onShowColumnSettings: _openColumnSettings,
                         onColumnWidthChanged: _controller.updateColumnWidth,
-                        onConfigSelected: _configSelected,
-                        onConfigAll: _configAll,
+                        onConfigSelected: () => _configSelected(context),
+                        onConfigAll: () => _configAll(context),
                       ),
                     ),
                   ],

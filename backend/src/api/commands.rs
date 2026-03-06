@@ -117,12 +117,7 @@ async fn execute_antminer_command(
         }
 
         MinerCommand::SetPools { pools } => {
-            use crate::client::antminer_web::AntminerPool;
-            let antminer_pools: Vec<AntminerPool> = pools
-                .into_iter()
-                .map(|p| AntminerPool { url: p.url, user: p.worker, pass: p.password })
-                .collect();
-            match AntminerWebClient::set_pools(&ip, user, pass, antminer_pools).await {
+            match AntminerWebClient::set_pools(&ip, user, pass, pools).await {
                 Ok(_) => {
                     println!("Antminer set_pools SUCCESS for {} (will reboot automatically)", ip);
                     CommandResult { ip, success: true, error: None }
@@ -206,16 +201,11 @@ pub fn test_connection(ip: String) -> String {
 ///
 /// `pools` must have 1–3 entries.
 pub async fn set_miner_pools(ip: String, pools: Vec<crate::api::models::PoolConfig>) -> CommandResult {
-    use crate::client::antminer_web::{AntminerWebClient, AntminerPool};
+    use crate::client::antminer_web::AntminerWebClient;
     let settings = AppSettings::load();
     let creds = settings.antminer_credentials;
 
-    let antminer_pools: Vec<AntminerPool> = pools
-        .into_iter()
-        .map(|p| AntminerPool { url: p.url, user: p.worker, pass: p.password })
-        .collect();
-
-    match AntminerWebClient::set_pools(&ip, &creds.username, &creds.password, antminer_pools).await {
+    match AntminerWebClient::set_pools(&ip, &creds.username, &creds.password, pools).await {
         Ok(_) => CommandResult { ip, success: true, error: None },
         Err(e) => CommandResult { ip, success: false, error: Some(e.to_string()) },
     }
@@ -237,11 +227,14 @@ pub async fn get_miner_pools(ip: String) -> Vec<crate::api::models::PoolConfig> 
 }
 
 /// Set the power mode on a miner. Detects Whatsminer vs Antminer automatically.
-/// - `sleep = true`  → Low Power Mode
-/// - `sleep = false` → Normal mode
-pub async fn set_miner_power_mode(ip: String, sleep: bool) -> CommandResult {
+///
+/// PowerMode mapping:
+///   Antminer  — Normal=0, Sleep=1, Lpm=3 (via `miner-mode` field in set_miner_conf.cgi)
+///   Whatsminer — Normal="Normal", Lpm="Low", Sleep="Low" (no dedicated sleep, falls back to Low)
+pub async fn set_miner_power_mode(ip: String, mode: crate::api::models::PowerMode) -> CommandResult {
     use crate::client::antminer_web::AntminerWebClient;
     use crate::client::whatsminer_web::WhatsminerWebClient;
+    use crate::api::models::PowerMode;
     let settings = AppSettings::load();
 
     // Detect miner type via CGMiner summary (same logic as execute_single_command)
@@ -255,11 +248,14 @@ pub async fn set_miner_power_mode(ip: String, sleep: bool) -> CommandResult {
 
     if is_whatsminer {
         let creds = settings.whatsminer_credentials;
-        // Map sleep flag to Whatsminer LuCI `miner_type` field value
-        let mode = if sleep { "Low" } else { "Normal" };
-        match WhatsminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, mode).await {
+        // Whatsminer LuCI `miner_type` field — no true Sleep mode, map Sleep→Low
+        let mode_str = match mode {
+            PowerMode::Normal => "Normal",
+            PowerMode::Lpm | PowerMode::Sleep => "Low",
+        };
+        match WhatsminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, mode_str).await {
             Ok(_) => {
-                println!("Whatsminer set_power_mode({}) SUCCESS for {}", mode, ip);
+                println!("Whatsminer set_power_mode({}) SUCCESS for {}", mode_str, ip);
                 CommandResult { ip, success: true, error: None }
             }
             Err(e) => {
@@ -269,11 +265,17 @@ pub async fn set_miner_power_mode(ip: String, sleep: bool) -> CommandResult {
         }
     } else {
         let creds = settings.antminer_credentials;
-        match AntminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, sleep).await {
+        // Antminer miner-mode: Normal=0, Sleep=1, LPM=2
+        let mode_u8: u8 = match mode {
+            PowerMode::Normal => 0,
+            PowerMode::Sleep  => 1,
+            PowerMode::Lpm    => 3,
+        };
+        match AntminerWebClient::set_power_mode(&ip, &creds.username, &creds.password, mode_u8).await {
             Ok(_) => {
                 println!(
-                    "Antminer set_power_mode({}) SUCCESS for {} (will reboot automatically)",
-                    if sleep { "sleep" } else { "normal" }, ip
+                    "Antminer set_power_mode(mode={}) SUCCESS for {} (will reboot automatically)",
+                    mode_u8, ip
                 );
                 CommandResult { ip, success: true, error: None }
             }
@@ -284,4 +286,3 @@ pub async fn set_miner_power_mode(ip: String, sleep: bool) -> CommandResult {
         }
     }
 }
-
