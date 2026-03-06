@@ -21,8 +21,13 @@ pub struct AntminerPool {
 
 /// Response from `/cgi-bin/get_miner_conf.cgi`.
 /// We serialise this back verbatim for the write endpoint, only swapping the
-/// fields we care about (pools / miner-mode).  Any unknown fields from the
+/// fields we care about (pools / work-mode).  Any unknown fields from the
 /// miner are preserved through `serde_json::Value` so we don't clobber them.
+///
+/// Key observations from real device (Antminer, firmware 2024):
+///   - Power mode is stored as **`"bitmain-work-mode"`** with a **string** value:
+///       "0" = Normal, "1" = Sleep, "2" = Low Power Mode (LPM)
+///   - `"freq-level"` is actually `"bitmain-freq-level"` on real firmware.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MinerConf {
     #[serde(default)]
@@ -34,16 +39,33 @@ struct MinerConf {
     #[serde(rename = "bitmain-fan-pwm", default = "default_fan_pwm")]
     pub fan_pwm: String,
 
-    /// 0 = normal, 1 = sleep
-    #[serde(rename = "miner-mode", default)]
-    pub miner_mode: u8,
+    /// Power-mode string: "0"=Normal, "1"=Sleep, "2"=LPM.
+    /// Stored as String to survive verbatim round-trip through set_miner_conf.cgi.
+    #[serde(rename = "bitmain-work-mode", default = "default_work_mode")]
+    pub work_mode: String,
 
-    #[serde(rename = "freq-level", default = "default_freq_level")]
+    #[serde(rename = "bitmain-freq-level", default = "default_freq_level")]
     pub freq_level: String,
+}
+
+impl MinerConf {
+    /// Parse work_mode string to u8 (safe: unknown values return 0=Normal).
+    pub fn work_mode_u8(&self) -> u8 {
+        self.work_mode.trim().parse::<u8>().unwrap_or(0)
+    }
+
+    /// Set work_mode from a u8 value.
+    pub fn set_work_mode(&mut self, mode: u8) {
+        self.work_mode = mode.to_string();
+    }
 }
 
 fn default_fan_pwm() -> String {
     "100".to_string()
+}
+
+fn default_work_mode() -> String {
+    "0".to_string()
 }
 
 fn default_freq_level() -> String {
@@ -279,7 +301,7 @@ impl AntminerWebClient {
 
     /// Set the power mode.
     ///
-    /// `mode` is the raw Antminer `miner-mode` u8 value:
+    /// `mode` is the raw Antminer work-mode value:
     ///   - 0 → Normal
     ///   - 1 → Sleep  (stops hashing, stays reachable)
     ///   - 2 → Low Power Mode (LPM; reduced hashrate — only newer firmware)
@@ -287,7 +309,7 @@ impl AntminerWebClient {
     /// Triggers an automatic reboot.
     pub async fn set_power_mode(ip: &str, username: &str, password: &str, mode: u8) -> Result<()> {
         let mut conf = Self::get_miner_conf(ip, username, password).await?;
-        conf.miner_mode = mode;
+        conf.set_work_mode(mode);
         let body = serde_json::to_string(&conf)
             .map_err(|e| format!("Failed to serialise miner conf: {}", e))?;
         // Miner reboots on mode change — use tolerant POST
@@ -296,10 +318,10 @@ impl AntminerWebClient {
     }
 
     /// Read the current power mode without changing anything.
-    /// Returns the raw `miner-mode` u8 value (0=Normal, 1=Sleep, 2=LPM).
+    /// Returns the raw work-mode u8 value (0=Normal, 1=Sleep, 2=LPM).
     pub async fn read_power_mode(ip: &str, username: &str, password: &str) -> Result<u8> {
         let conf = Self::get_miner_conf(ip, username, password).await?;
-        Ok(conf.miner_mode)
+        Ok(conf.work_mode_u8())
     }
 
     /// Configure up to three mining pools.
