@@ -8,47 +8,33 @@ import '../frb_generated.dart';
 import 'models.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `execute_antminer_command`, `execute_single_command`, `execute_whatsminer_command`
 
-/// Execute a command on multiple miners in parallel.
+            // These functions are ignored because they are not marked as `pub`: `execute_antminer_command`, `execute_single_command`, `execute_whatsminer_command`
+
+
+            /// Execute a command on multiple miners in parallel.
 /// Returns results for each IP (success/failure).
-Future<List<CommandResult>> executeBatchCommand({
-  required List<String> targetIps,
-  required MinerCommand command,
-  MinerCredentials? credentials,
-}) => RustLib.instance.api.crateApiCommandsExecuteBatchCommand(
-  targetIps: targetIps,
-  command: command,
-  credentials: credentials,
-);
+Future<List<CommandResult>>  executeBatchCommand({required List<String> targetIps , required MinerCommand command , MinerCredentials? credentials }) => RustLib.instance.api.crateApiCommandsExecuteBatchCommand(targetIps: targetIps, command: command, credentials: credentials);
 
 /// Test connection to a single miner
-Future<String> testConnection({required String ip}) =>
-    RustLib.instance.api.crateApiCommandsTestConnection(ip: ip);
+Future<String>  testConnection({required String ip }) => RustLib.instance.api.crateApiCommandsTestConnection(ip: ip);
 
 /// Set mining pools on a single Antminer via its HTTP API.
 /// Reads the current config first to preserve fan/frequency settings.
 /// The miner will automatically reboot ~2 minutes after applying the change.
 ///
 /// `pools` must have 1–3 entries.
-Future<CommandResult> setMinerPools({
-  required String ip,
-  required List<PoolConfig> pools,
-}) => RustLib.instance.api.crateApiCommandsSetMinerPools(ip: ip, pools: pools);
+Future<CommandResult>  setMinerPools({required String ip , required List<PoolConfig> pools }) => RustLib.instance.api.crateApiCommandsSetMinerPools(ip: ip, pools: pools);
 
 /// Read the currently configured pools from a single Antminer.
-Future<List<PoolConfig>> getMinerPools({required String ip}) =>
-    RustLib.instance.api.crateApiCommandsGetMinerPools(ip: ip);
+Future<List<PoolConfig>>  getMinerPools({required String ip }) => RustLib.instance.api.crateApiCommandsGetMinerPools(ip: ip);
 
-/// Set the power mode on a single Antminer via its HTTP API.
-/// - `sleep = true`  → Low Power Mode (LPM) — miner reduces hashrate to save power
-/// - `sleep = false` → Normal mode — miner resumes full operation
+/// Set the power mode on a miner. Detects Whatsminer vs Antminer automatically.
 ///
-/// The miner will automatically reboot after applying the change.
-Future<CommandResult> setMinerPowerMode({
-  required String ip,
-  required bool sleep,
-}) => RustLib.instance.api.crateApiCommandsSetMinerPowerMode(
-  ip: ip,
-  sleep: sleep,
-);
+/// PowerMode mapping:
+///   Antminer  — Normal=0, Sleep=1, Lpm=2 (via `miner-mode` field in set_miner_conf.cgi)
+///   Whatsminer — Normal="Normal", Lpm="Low", Sleep="Low" (no dedicated sleep, falls back to Low)
+Future<CommandResult>  setMinerPowerMode({required String ip , required PowerMode mode }) => RustLib.instance.api.crateApiCommandsSetMinerPowerMode(ip: ip, mode: mode);
+
+            
+            

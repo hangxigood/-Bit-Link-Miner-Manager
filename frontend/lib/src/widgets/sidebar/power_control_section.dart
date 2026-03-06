@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/src/rust/api/models.dart';
 import 'package:frontend/src/theme/app_theme.dart';
-
-/// Power mode selection. Only LPM is supported via the Antminer HTTP API.
-enum PowerMode { normal, lpm }
 
 class PowerControlSection extends StatefulWidget {
   final Function(String) onShowToast;
@@ -17,13 +15,10 @@ class PowerControlSectionState extends State<PowerControlSection> {
   bool _enabled = false;
   PowerMode _mode = PowerMode.normal;
 
-  /// Returns the selected power mode if power control is enabled, null otherwise.
-  /// - `true`  → put miner into Low Power Mode (sleep)
-  /// - `false` → restore normal operation
-  /// - `null`  → power control not enabled (do nothing)
-  bool? getPowerMode() {
+  /// Returns the selected [PowerMode] if power control is enabled, or null.
+  PowerMode? getSelectedPowerMode() {
     if (!_enabled) return null;
-    return _mode == PowerMode.lpm;
+    return _mode;
   }
 
   @override
@@ -72,7 +67,7 @@ class PowerControlSectionState extends State<PowerControlSection> {
                 SizedBox(height: 6),
                 _buildModeOption(
                   label: 'Normal',
-                  subtitle: 'Full power — resume mining at full hashrate',
+                  subtitle: 'Full power — mine at full hashrate',
                   value: PowerMode.normal,
                 ),
                 SizedBox(height: 4),
@@ -80,6 +75,12 @@ class PowerControlSectionState extends State<PowerControlSection> {
                   label: 'Low Power Mode (LPM)',
                   subtitle: 'Reduced hashrate to save power. Miner reboots.',
                   value: PowerMode.lpm,
+                ),
+                SizedBox(height: 4),
+                _buildModeOption(
+                  label: 'Sleep',
+                  subtitle: 'Stop hashing, stay reachable. Miner reboots.',
+                  value: PowerMode.sleep,
                 ),
               ],
             ),

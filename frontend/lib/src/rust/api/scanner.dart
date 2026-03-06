@@ -7,16 +7,19 @@ import '../core/models.dart';
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-/// Start scanning a network range for miners
+
+            
+
+            /// Start scanning a network range for miners
 /// Returns all discovered miners after scan completes
-Future<List<Miner>> startScan({required String ipRange}) =>
-    RustLib.instance.api.crateApiScannerStartScan(ipRange: ipRange);
+Future<List<Miner>>  startScan({required String ipRange }) => RustLib.instance.api.crateApiScannerStartScan(ipRange: ipRange);
 
 /// Validate an IP range string without starting a scan
-Future<String> validateIpRange({required String range}) =>
-    RustLib.instance.api.crateApiScannerValidateIpRange(range: range);
+Future<String>  validateIpRange({required String range }) => RustLib.instance.api.crateApiScannerValidateIpRange(range: range);
 
 /// Detect local network interfaces and return their /24 subnet ranges.
 /// Filters out loopback (127.x.x.x) and link-local (169.254.x.x) addresses.
-Future<List<String>> detectLocalRanges() =>
-    RustLib.instance.api.crateApiScannerDetectLocalRanges();
+Future<List<String>>  detectLocalRanges() => RustLib.instance.api.crateApiScannerDetectLocalRanges();
+
+            
+            

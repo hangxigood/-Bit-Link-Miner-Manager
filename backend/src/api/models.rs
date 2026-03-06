@@ -19,6 +19,24 @@ pub enum MinerCommand {
     SetPools { pools: Vec<PoolConfig> },
 }
 
+/// Power mode for a miner.
+///
+/// Antminer miner-mode values (field `miner-mode` in `set_miner_conf.cgi`):
+///   - Normal → 0
+///   - Sleep  → 1   (miner stops hashing, stays reachable)
+///   - Lpm    → 2   (Low Power Mode — reduced hashrate; not all firmware supports this)
+///
+/// Whatsminer (LuCI `miner_type` field):
+///   - Normal → "Normal"
+///   - Lpm    → "Low"
+///   - Sleep  → "Low"  (no dedicated sleep mode; falls back to Low)
+#[derive(Debug, Clone, Copy)]
+pub enum PowerMode {
+    Normal,
+    Lpm,
+    Sleep,
+}
+
 /// Result of a batch command execution
 #[derive(Debug, Clone)]
 pub struct CommandResult {

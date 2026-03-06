@@ -278,13 +278,16 @@ impl AntminerWebClient {
     }
 
     /// Set the power mode.
-    /// - `sleep: true`  → miner enters sleep / low-power mode
-    /// - `sleep: false` → miner returns to normal mining mode
+    ///
+    /// `mode` is the raw Antminer `miner-mode` u8 value:
+    ///   - 0 → Normal
+    ///   - 1 → Sleep  (stops hashing, stays reachable)
+    ///   - 2 → Low Power Mode (LPM; reduced hashrate — only newer firmware)
     ///
     /// Triggers an automatic reboot.
-    pub async fn set_power_mode(ip: &str, username: &str, password: &str, sleep: bool) -> Result<()> {
+    pub async fn set_power_mode(ip: &str, username: &str, password: &str, mode: u8) -> Result<()> {
         let mut conf = Self::get_miner_conf(ip, username, password).await?;
-        conf.miner_mode = if sleep { 1 } else { 0 };
+        conf.miner_mode = mode;
         let body = serde_json::to_string(&conf)
             .map_err(|e| format!("Failed to serialise miner conf: {}", e))?;
         // Miner reboots on mode change — use tolerant POST
